@@ -5,41 +5,15 @@ export const useApiKeys = () => {
   const [apiKey, setApiKey] = useState('');
   const [fdcApiKey, setFdcApiKey] = useState('');
   
-  // Estados para modales de configuración
+  // Estados para modales
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [showFdcApiKeyInput, setShowFdcApiKeyInput] = useState(false);
-
-  // Estados para análisis y búsqueda
+  
+  // Estados para loading
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Función helper para verificar si ambas APIs están configuradas
-  const areApiKeysConfigured = () => {
-    return apiKey && fdcApiKey;
-  };
-
-  // Función helper para verificar solo OpenAI
-  const isOpenAIConfigured = () => {
-    return !!apiKey;
-  };
-
-  // Función helper para verificar solo FoodData Central
-  const isFDCConfigured = () => {
-    return !!fdcApiKey;
-  };
-
-  // Función para mostrar alerta de API Key faltante
-  const showApiKeyAlert = (apiType = 'OpenAI') => {
-    if (apiType === 'OpenAI') {
-      alert('Por favor, configura tu API Key de OpenAI primero');
-      setShowApiKeyInput(true);
-    } else if (apiType === 'FDC') {
-      alert('Por favor, configura tu API Key de FoodData Central y escribe un término de búsqueda');
-      setShowFdcApiKeyInput(true);
-    }
-  };
-
-  // Función para convertir archivo a Base64 (para análisis de imágenes)
+  // Función helper para convertir archivo a Base64
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -49,58 +23,17 @@ export const useApiKeys = () => {
     });
   };
 
-  // Función para hacer llamadas a OpenAI API
-  const callOpenAI = async (messages, options = {}) => {
-    if (!apiKey) {
-      showApiKeyAlert('OpenAI');
-      return null;
-    }
-
-    const defaultOptions = {
-      model: "gpt-4",
-      max_tokens: 500,
-      temperature: 0.7,
-      ...options
-    };
-
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          ...defaultOptions,
-          messages
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        return data.choices[0].message.content;
-      } else {
-        throw new Error('Respuesta inválida de la API');
-      }
-    } catch (error) {
-      console.error('Error calling OpenAI:', error);
-      throw error;
-    }
-  };
-
-  // Función para buscar alimentos en FoodData Central por nombre
+  // Función para buscar alimentos por nombre en FoodData Central
   const searchFoodByName = async (query) => {
     if (!fdcApiKey || !query.trim()) {
-      showApiKeyAlert('FDC');
+      alert('Por favor, configura tu API Key de FoodData Central y escribe un término de búsqueda');
+      setShowFdcApiKeyInput(true);
       return [];
     }
 
     setIsSearching(true);
     try {
-      const response = await fetch(
-        `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${fdcApiKey}&query=${encodeURIComponent(query)}&dataType=Foundation,SR%20Legacy&pageSize=10`
-      );
+      const response = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${fdcApiKey}&query=${encodeURIComponent(query)}&dataType=Foundation,SR%20Legacy&pageSize=10`);
       
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -126,7 +59,8 @@ export const useApiKeys = () => {
   // Función para obtener información nutricional por FDC ID
   const getFoodNutrition = async (fdcId) => {
     if (!fdcApiKey) {
-      showApiKeyAlert('FDC');
+      alert('Por favor, configura tu API Key de FoodData Central');
+      setShowFdcApiKeyInput(true);
       return null;
     }
 
@@ -141,7 +75,6 @@ export const useApiKeys = () => {
       const data = await response.json();
       const nutrients = data.foodNutrients || [];
       
-      // Extraer nutrientes específicos
       const energyNutrient = nutrients.find(n => n.nutrient.id === 1008);
       const proteinNutrient = nutrients.find(n => n.nutrient.id === 1003);
       const carbsNutrient = nutrients.find(n => n.nutrient.id === 1005);
@@ -164,7 +97,7 @@ export const useApiKeys = () => {
     }
   };
 
-  // Función para buscar por código de barras (OpenFoodFacts)
+  // Función para buscar por código de barras
   const searchByBarcode = async (barcode) => {
     if (!barcode || barcode.length < 8) {
       alert('Por favor, ingresa un código de barras válido (mínimo 8 dígitos)');
@@ -189,7 +122,7 @@ export const useApiKeys = () => {
             serving: '100'
           };
         } else {
-          // Si no tiene nutrientes, intentar buscar por nombre en FDC
+          // Si no tiene nutrientes, intentar buscar por nombre
           const productName = product.product_name || product.product_name_es;
           if (productName && fdcApiKey) {
             const searchResults = await searchFoodByName(productName);
@@ -230,7 +163,8 @@ export const useApiKeys = () => {
   // Función para analizar imagen con IA
   const analyzeImageWithAI = async (imageFile) => {
     if (!apiKey) {
-      showApiKeyAlert('OpenAI');
+      alert('Por favor, configura tu API Key de OpenAI primero');
+      setShowApiKeyInput(true);
       return null;
     }
 
@@ -238,79 +172,132 @@ export const useApiKeys = () => {
     try {
       const base64Image = await convertToBase64(imageFile);
       
-      const messages = [
-        {
-          role: "user",
-          content: [
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
             {
-              type: "text",
-              text: "Analiza esta imagen de comida y proporciona la siguiente información en formato JSON exacto:\n{\n  \"name\": \"nombre del plato\",\n  \"calories\": número_de_calorías,\n  \"protein\": gramos_de_proteína,\n  \"carbs\": gramos_de_carbohidratos,\n  \"fat\": gramos_de_grasa\n}\n\nSolo responde con el JSON, sin texto adicional."
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: base64Image
-              }
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Analiza esta imagen de comida y proporciona la siguiente información en formato JSON exacto:\n{\n  \"name\": \"nombre del plato\",\n  \"calories\": número_de_calorías,\n  \"protein\": gramos_de_proteína,\n  \"carbs\": gramos_de_carbohidratos,\n  \"fat\": gramos_de_grasa\n}\n\nSolo responde con el JSON, sin texto adicional."
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: base64Image
+                  }
+                }
+              ]
             }
-          ]
-        }
-      ];
-
-      const response = await callOpenAI(messages, {
-        model: "gpt-4o",
-        max_tokens: 300
+          ],
+          max_tokens: 300
+        })
       });
 
-      const analysis = JSON.parse(response);
-      return {
-        name: analysis.name,
-        calories: analysis.calories.toString(),
-        protein: analysis.protein.toString(),
-        carbs: analysis.carbs.toString(),
-        fat: analysis.fat.toString(),
-        serving: '100'
-      };
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
-      alert('Error al procesar la respuesta de la IA');
+      const data = await response.json();
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        try {
+          const analysis = JSON.parse(data.choices[0].message.content);
+          return {
+            name: analysis.name,
+            calories: analysis.calories.toString(),
+            protein: analysis.protein.toString(),
+            carbs: analysis.carbs.toString(),
+            fat: analysis.fat.toString(),
+            serving: '100'
+          };
+        } catch (parseError) {
+          console.error('Error parsing AI response:', parseError);
+          alert('Error al procesar la respuesta de la IA');
+          return null;
+        }
+      } else {
+        throw new Error('Respuesta inválida de la API');
+      }
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      alert('Error al analizar la imagen. Verifica tu API Key.');
       return null;
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // Retornar todo lo que necesita el componente principal
+  // Función para enviar mensaje a OpenAI
+  const sendMessageToAI = async (messages) => {
+    if (!apiKey) {
+      alert('Por favor, configura tu API Key de OpenAI primero');
+      setShowApiKeyInput(true);
+      return null;
+    }
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4",
+          messages: messages,
+          max_tokens: 500,
+          temperature: 0.7
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        return data.choices[0].message.content;
+      } else {
+        throw new Error('Respuesta inválida de la API');
+      }
+    } catch (error) {
+      console.error('Error sending message to AI:', error);
+      throw error;
+    }
+  };
+
+  // Funciones helper para verificar configuración
+  const isOpenAIConfigured = () => !!apiKey;
+  const isFDCConfigured = () => !!fdcApiKey;
+  const areAllApiKeysConfigured = () => apiKey && fdcApiKey;
+
   return {
-    // Estados de API Keys
+    // Estados
     apiKey,
     setApiKey,
     fdcApiKey,
     setFdcApiKey,
-    
-    // Estados de modales
     showApiKeyInput,
     setShowApiKeyInput,
     showFdcApiKeyInput,
     setShowFdcApiKeyInput,
-    
-    // Estados de carga
     isAnalyzing,
     setIsAnalyzing,
     isSearching,
     setIsSearching,
     
-    // Funciones helper
-    areApiKeysConfigured,
-    isOpenAIConfigured,
-    isFDCConfigured,
-    showApiKeyAlert,
-    
     // Funciones de API
-    callOpenAI,
     searchFoodByName,
     getFoodNutrition,
     searchByBarcode,
     analyzeImageWithAI,
-    convertToBase64
+    sendMessageToAI,
+    convertToBase64,
+    
+    // Helpers
+    isOpenAIConfigured,
+    isFDCConfigured,
+    areAllApiKeysConfigured
   };
 };
