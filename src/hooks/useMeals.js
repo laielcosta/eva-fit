@@ -1,44 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 export const useMeals = () => {
-  // Estados relacionados con comidas
-  const [meals, setMeals] = useState([
-    {
-      id: 1,
-      name: 'Avena con frutas',
-      time: '08:30',
-      calories: 350,
-      protein: 12,
-      carbs: 58,
-      fat: 8
-    },
-    {
-      id: 2,
-      name: 'Pollo con arroz',
-      time: '13:15',
-      calories: 520,
-      protein: 35,
-      carbs: 45,
-      fat: 18
-    },
-    {
-      id: 3,
-      name: 'Ensalada de atún',
-      time: '20:30',
-      calories: 280,
-      protein: 25,
-      carbs: 15,
-      fat: 12
-    }
-  ]);
-
-  const [recentFoods, setRecentFoods] = useState([
-    { name: 'Pollo a la plancha', calories: 165, protein: 31, carbs: 0, fat: 3.6 },
-    { name: 'Arroz integral', calories: 123, protein: 2.6, carbs: 23, fat: 0.9 },
-    { name: 'Plátano', calories: 89, protein: 1.1, carbs: 23, fat: 0.3 },
-    { name: 'Avena', calories: 68, protein: 2.4, carbs: 12, fat: 1.4 }
-  ]);
-
+  // Estados - ahora se sincronizan con la API
+  const [meals, setMeals] = useState([]);
+  const [recentFoods, setRecentFoods] = useState([]);
   const [newMeal, setNewMeal] = useState({ 
     name: '', 
     calories: '', 
@@ -47,14 +13,43 @@ export const useMeals = () => {
     fat: '', 
     serving: '100'
   });
-
-  // Metas diarias
   const [dailyGoals, setDailyGoals] = useState({
     calories: 2000,
     protein: 150,
     carbs: 250,
     fat: 65
   });
+
+  // Estados de carga
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        // Cargar múltiples datos en paralelo
+        const [mealsResponse, recentFoodsResponse, goalsResponse] = await Promise.all([
+          api.meals.getToday(),
+          api.recentFoods.get(),
+          api.goals.get()
+        ]);
+
+        if (mealsResponse.success) setMeals(mealsResponse.data);
+        if (recentFoodsResponse.success) setRecentFoods(recentFoodsResponse.data);
+        if (goalsResponse.success) setDailyGoals(goalsResponse.data);
+
+      } catch (err) {
+        setError('Error cargando datos');
+        console.error('Error loading initial data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
 
   // Cálculos derivados - exactamente igual que antes
   const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0);
@@ -73,40 +68,113 @@ export const useMeals = () => {
     { day: 'Dom', calories: totalCalories, protein: totalProtein, carbs: totalCarbs, fat: totalFat }
   ];
 
-  // Función para agregar comida - exactamente igual que antes
-  const addMeal = (setActiveTab, setShowQuickActions, setSearchResults, setSearchQuery) => {
-    if (newMeal.name && newMeal.calories) {
+  // Función para agregar comida - ahora usa la API
+  const addMeal = async (setActiveTab, setShowQuickActions, setSearchResults, setSearchQuery) => {
+    if (!newMeal.name || !newMeal.calories) return;
+
+    try {
       const servingRatio = parseInt(newMeal.serving) / 100;
-      const meal = {
-        id: meals.length + 1,
+      const mealData = {
         name: newMeal.name,
-        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
         calories: Math.round(parseInt(newMeal.calories) * servingRatio),
         protein: Math.round(parseFloat(newMeal.protein) * servingRatio * 10) / 10,
         carbs: Math.round(parseFloat(newMeal.carbs) * servingRatio * 10) / 10,
         fat: Math.round(parseFloat(newMeal.fat) * servingRatio * 10) / 10
       };
-      setMeals([...meals, meal]);
-      setNewMeal({ name: '', calories: '', protein: '', carbs: '', fat: '', serving: '100' });
-      setSearchResults([]);
-      setSearchQuery('');
-      setActiveTab('home');
-      setShowQuickActions(false);
+
+      // Llamada a la API
+      const response = await api.meals.create(mealData);
+      
+      if (response.success) {
+        // Actualizar estado local
+        setMeals(prev => [...prev, response.data]);
+        
+        // Agregar a alimentos recientes
+        await api.recentFoods.add({
+          name: newMeal.name,
+          calories: parseInt(newMeal.calories),
+          protein: parseFloat(newMeal.protein),
+          carbs: parseFloat(newMeal.carbs),
+          fat: parseFloat(newMeal.fat)
+        });
+
+        // Limpiar formulario y navegar
+        setNewMeal({ name: '', calories: '', protein: '', carbs: '', fat: '', serving: '100' });
+        setSearchResults([]);
+        setSearchQuery('');
+        setActiveTab('home');
+        setShowQuickActions(false);
+      } else {
+        setError('Error al agregar comida');
+      }
+    } catch (err) {
+      setError('Error al agregar comida');
+      console.error('Error adding meal:', err);
     }
   };
 
-  // Función para agregar desde alimentos recientes - exactamente igual que antes
-  const addMealFromRecent = (food, setActiveTab, setShowQuickActions) => {
-    setNewMeal({
-      name: food.name,
-      calories: food.calories.toString(),
-      protein: food.protein.toString(),
-      carbs: food.carbs.toString(),
-      fat: food.fat.toString(),
-      serving: '100'
-    });
-    setActiveTab('nutrition');
-    setShowQuickActions(false);
+  // Función para agregar desde alimentos recientes - ahora usa la API
+  const addMealFromRecent = async (food, setActiveTab, setShowQuickActions) => {
+    try {
+      setNewMeal({
+        name: food.name,
+        calories: food.calories.toString(),
+        protein: food.protein.toString(),
+        carbs: food.carbs.toString(),
+        fat: food.fat.toString(),
+        serving: '100'
+      });
+      
+      // Actualizar el uso del alimento reciente
+      await api.recentFoods.add(food);
+      
+      setActiveTab('nutrition');
+      setShowQuickActions(false);
+    } catch (err) {
+      console.error('Error adding meal from recent:', err);
+    }
+  };
+
+  // Función para actualizar metas
+  const updateGoals = async (newGoals) => {
+    try {
+      const response = await api.goals.update(newGoals);
+      if (response.success) {
+        setDailyGoals(response.data);
+      } else {
+        setError('Error al actualizar metas');
+      }
+    } catch (err) {
+      setError('Error al actualizar metas');
+      console.error('Error updating goals:', err);
+    }
+  };
+
+  // Función para eliminar comida
+  const deleteMeal = async (mealId) => {
+    try {
+      const response = await api.meals.delete(mealId);
+      if (response.success) {
+        setMeals(prev => prev.filter(meal => meal.id !== mealId));
+      } else {
+        setError('Error al eliminar comida');
+      }
+    } catch (err) {
+      setError('Error al eliminar comida');
+      console.error('Error deleting meal:', err);
+    }
+  };
+
+  // Función para refrescar datos
+  const refreshMeals = async () => {
+    try {
+      const response = await api.meals.getToday();
+      if (response.success) {
+        setMeals(response.data);
+      }
+    } catch (err) {
+      console.error('Error refreshing meals:', err);
+    }
   };
 
   // Retornar todo lo que necesita el componente principal
@@ -121,6 +189,11 @@ export const useMeals = () => {
     dailyGoals,
     setDailyGoals,
     
+    // Estados de carga y error
+    isLoading,
+    error,
+    setError,
+    
     // Valores calculados
     totalCalories,
     totalProtein,
@@ -130,6 +203,9 @@ export const useMeals = () => {
     
     // Funciones
     addMeal,
-    addMealFromRecent
+    addMealFromRecent,
+    updateGoals,
+    deleteMeal,
+    refreshMeals
   };
 };
