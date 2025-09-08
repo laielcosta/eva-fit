@@ -1,205 +1,103 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Utensils, Dumbbell, Target, Plus, Home, MessageCircle, TrendingUp, Clock, Zap, Send, Bot, User, Scan, Search, X, Flame, Settings, ChevronRight, Activity, BarChart3, UserCircle, History } from 'lucide-react';
 import { useMeals } from './hooks/useMeals';
 import { useApiKeys } from './hooks/useApiKeys';
 import CalorieDonutChart from './components/CalorieDonutChart';
+import MacroBar from './components/MacroBar';
 
 const EVAFitApp = () => {
-  // Hooks personalizados
+  // Hooks de lógica de negocio
   const {
-    meals, setMeals, recentFoods, setRecentFoods, newMeal, setNewMeal,
-    dailyGoals, setDailyGoals, totalCalories, totalProtein, totalCarbs, totalFat,
-    nutritionProgress, addMeal: addMealHook, addMealFromRecent: addMealFromRecentHook
+    meals, setMeals, recentFoods, setRecentFoods,
+    newMeal, setNewMeal, dailyGoals, setDailyGoals,
+    totalCalories, totalProtein, totalCarbs, totalFat,
+    nutritionProgress, addMeal: addMealHook, addMealFromRecent: addMealFromRecentHook,
+    isLoading: mealsLoading, error: mealsError, deleteMeal, refreshMeals, updateDailyGoals
   } = useMeals();
 
   const {
-    apiKey, setApiKey, fdcApiKey, setFdcApiKey, showApiKeyInput, setShowApiKeyInput,
-    showFdcApiKeyInput, setShowFdcApiKeyInput, isAnalyzing, setIsAnalyzing,
-    isSearching, setIsSearching, searchFoodByName, getFoodNutrition,
-    searchByBarcode, analyzeImageWithAI, sendMessageToAI, isOpenAIConfigured,
-    isFDCConfigured, areAllApiKeysConfigured
+    apiKey, setApiKey, fdcApiKey, setFdcApiKey,
+    showApiKeyInput, setShowApiKeyInput, showFdcApiKeyInput, setShowFdcApiKeyInput,
+    isAnalyzing, isSearching, searchFoodByName: searchFoodByNameAPI, getFoodNutrition: getFoodNutritionAPI,
+    searchByBarcode: searchByBarcodeAPI, analyzeImageWithAI: analyzeImageWithAIAPI,
+    sendMessageToAI: sendMessageToAIAPI, isOpenAIConfigured, isFDCConfigured, areAllApiKeysConfigured
   } = useApiKeys();
 
-  // Estados locales del componente
+  // Estados locales para navegación y UI
   const [activeTab, setActiveTab] = useState('home');
-  const [isScanningBarcode, setIsScanningBarcode] = useState(false);
+  const [workouts, setWorkouts] = useState([
+    { id: 1, name: 'Push-ups', duration: 15, calories: 120, date: new Date().toISOString().split('T')[0] },
+    { id: 2, name: 'Running', duration: 30, calories: 300, date: new Date().toISOString().split('T')[0] }
+  ]);
+  
+  // Estados para funcionalidades específicas
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const [barcodeInput, setBarcodeInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [trackedDays, setTrackedDays] = useState(15);
-  const [showProgressDetail, setShowProgressDetail] = useState('nutrition');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showCamera, setShowCamera] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [scannedBarcode, setScannedBarcode] = useState('');
+  const [selectedFood, setSelectedFood] = useState(null);
   const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'assistant',
-      message: '¡Hola! Soy Eva, tu asistente personal de fitness. Puedo ayudarte con preguntas sobre nutrición, entrenamientos y analizar tus patrones alimenticios. ¿En qué puedo ayudarte?'
-    }
+    { id: 1, text: '¡Hola! Soy EVA, tu asistente nutricional. ¿En qué puedo ayudarte hoy?', sender: 'bot' }
   ]);
   const [newMessage, setNewMessage] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  
-  // Estados para entrenamientos
-  const [workouts, setWorkouts] = useState([
-    { id: 1, name: 'Entrenamiento de Pecho', duration: '45 min', exercises: 8, calories: 280, date: 'Hoy' },
-    { id: 2, name: 'Cardio HIIT', duration: '30 min', exercises: 6, calories: 320, date: 'Ayer' }
-  ]);
-  const [newWorkout, setNewWorkout] = useState({ name: '', duration: '', exercises: '' });
-  
-  // Perfil del usuario
-  const [userProfile, setUserProfile] = useState({
-    name: 'Usuario', weight: 70, height: 175, age: 25, activity: 'moderate', goal: 'maintain'
-  });
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
-  // Referencias
-  const fileInputRef = useRef(null);
+  // Referencias para funcionalidades específicas
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  // Datos para gráficos de entrenamiento
-  const workoutProgress = [
-    { day: 'Lun', duration: 45, calories: 280 },
-    { day: 'Mar', duration: 60, calories: 350 },
-    { day: 'Mié', duration: 30, calories: 200 },
-    { day: 'Jue', duration: 50, calories: 320 },
-    { day: 'Vie', duration: 40, calories: 250 },
-    { day: 'Sáb', duration: 70, calories: 420 },
-    { day: 'Dom', duration: 0, calories: 0 }
-  ];
-
-  // Funciones locales (no relacionadas con APIs)
-  const getDaysOfMonth = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const currentDay = today.getDate();
-    
-    const days = [];
-    for (let i = Math.max(1, currentDay - 6); i <= Math.min(daysInMonth, currentDay + 6); i++) {
-      days.push({
-        day: i,
-        isToday: i === currentDay,
-        hasData: i <= currentDay && i >= currentDay - 7
-      });
-    }
-    return days;
-  };
-
-  const startBarcodeScanner = async () => {
+  // Funciones utilitarias
+  const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setIsScanningBarcode(true);
       }
+      setShowCamera(true);
     } catch (error) {
       console.error('Error accessing camera:', error);
-      alert('No se pudo acceder a la cámara. Puedes ingresar el código manualmente.');
+      alert('No se pudo acceder a la cámara. Por favor, verifica los permisos.');
     }
   };
 
-  const stopBarcodeScanner = () => {
+  const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject;
-      const tracks = stream.getTracks();
+      const tracks = videoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
     }
-    setIsScanningBarcode(false);
+    setShowCamera(false);
   };
 
-  const getUserContext = () => {
-    return `
-    Contexto del usuario:
-    
-    COMIDAS DE HOY:
-    ${meals.map(meal => `- ${meal.name} (${meal.time}): ${meal.calories} cal, ${meal.protein}g proteína, ${meal.carbs}g carbos, ${meal.fat}g grasa`).join('\n')}
-    
-    TOTALES DIARIOS:
-    - Calorías totales: ${totalCalories}
-    - Proteína total: ${totalProtein}g
-    - Carbohidratos totales: ${totalCarbs}g
-    - Grasas totales: ${totalFat}g
-    
-    ENTRENAMIENTOS RECIENTES:
-    ${workouts.slice(0, 3).map(workout => `- ${workout.name} (${workout.date}): ${workout.duration}, ${workout.exercises} ejercicios, ${workout.calories} cal quemadas`).join('\n')}
-    
-    Responde como Eva, un asistente personal de fitness y nutrición experta, considerando este contexto.
-    `;
-  };
-
-  // Funciones de manejo mejoradas (usando los hooks)
-  const handleSearchFoodByName = async (query) => {
-    const results = await searchFoodByName(query);
-    setSearchResults(results);
-  };
-
-  const handleGetFoodNutrition = async (fdcId) => {
-    const nutrition = await getFoodNutrition(fdcId);
-    if (nutrition) {
-      setNewMeal(nutrition);
-      setSearchResults([]);
-      setSearchQuery('');
-      setActiveTab('nutrition');
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      const imageDataURL = canvas.toDataURL('image/jpeg');
+      setCapturedImage(imageDataURL);
+      stopCamera();
     }
   };
 
-  const handleSearchByBarcode = async (barcode) => {
-    const result = await searchByBarcode(barcode);
-    if (result) {
-      setNewMeal(result);
-      setActiveTab('nutrition');
-    }
-    setBarcodeInput('');
-  };
-
-  const handleAnalyzeImage = async (imageFile) => {
-    const result = await analyzeImageWithAI(imageFile);
-    if (result) {
-      setNewMeal(result);
-      setActiveTab('nutrition');
-    }
-  };
-
-  const handleFileSelect = (event) => {
+  const handleImageUpload = (event) => {
     const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
-      handleAnalyzeImage(file);
-    }
-    setShowQuickActions(false);
-  };
-
-  const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
-
-    const userMessage = { id: chatMessages.length + 1, type: 'user', message: newMessage };
-    setChatMessages(prev => [...prev, userMessage]);
-    setNewMessage('');
-    setIsThinking(true);
-
-    try {
-      const messages = [
-        { role: "system", content: getUserContext() },
-        { role: "user", content: newMessage }
-      ];
-
-      const response = await sendMessageToAI(messages);
-      if (response) {
-        const assistantMessage = { id: chatMessages.length + 2, type: 'assistant', message: response };
-        setChatMessages(prev => [...prev, assistantMessage]);
-      }
-    } catch (error) {
-      const errorMessage = {
-        id: chatMessages.length + 2,
-        type: 'assistant',
-        message: 'Lo siento, hubo un error al procesar tu mensaje. Verifica tu conexión y API Key.'
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setCapturedImage(e.target.result);
       };
-      setChatMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsThinking(false);
+      reader.readAsDataURL(file);
     }
   };
 
+  // Funciones principales que conectan con los hooks
   const addMeal = () => {
     addMealHook(setActiveTab, setShowQuickActions, setSearchResults, setSearchQuery);
   };
@@ -208,980 +106,929 @@ const EVAFitApp = () => {
     addMealFromRecentHook(food, setActiveTab, setShowQuickActions);
   };
 
-  const addWorkout = () => {
-    if (newWorkout.name && newWorkout.duration) {
-      const workout = {
-        id: workouts.length + 1,
-        name: newWorkout.name,
-        duration: newWorkout.duration,
-        exercises: parseInt(newWorkout.exercises) || 0,
-        calories: Math.floor(Math.random() * 200) + 150,
-        date: 'Hoy'
-      };
-      setWorkouts([...workouts, workout]);
-      setNewWorkout({ name: '', duration: '', exercises: '' });
-      setActiveTab('home');
-      setShowQuickActions(false);
+  const searchFoodByName = async (query) => {
+    const results = await searchFoodByNameAPI(query);
+    setSearchResults(results);
+  };
+
+  const getFoodNutrition = async (fdcId) => {
+    const nutrition = await getFoodNutritionAPI(fdcId);
+    setSelectedFood(nutrition);
+  };
+
+  const searchByBarcode = async (barcode) => {
+    const result = await searchByBarcodeAPI(barcode);
+    if (result) {
+      setSelectedFood(result);
     }
   };
 
-  // Componentes de UI
-  const MacroBar = ({ label, consumed, goal, color }) => {
-    const percentage = Math.min(100, (consumed / goal) * 100);
-    
-    return (
-      <div className="flex-1">
-        <div className="text-center mb-1">
-          <div className="text-xs text-gray-500 mb-1">{label}</div>
-          <div className="text-sm font-semibold text-gray-800">{consumed}g</div>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-1.5">
-          <div
-            className={`h-1.5 rounded-full transition-all duration-500 ${color}`}
-            style={{ width: `${percentage}%` }}
-          ></div>
-        </div>
-      </div>
-    );
+  const analyzeImageWithAI = async (imageData) => {
+    const result = await analyzeImageWithAIAPI(imageData);
+    return result;
   };
 
-  // Pantallas
-  const HomeScreen = () => {
-    const days = getDaysOfMonth();
-    
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white px-6 py-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-800">
-              <span className="text-gray-800">EVA</span> FIT
-            </h1>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${areAllApiKeysConfigured() ? 'bg-gray-800' : 'bg-gray-300'}`}></div>
-                <span className="text-xs text-gray-600">
-                  {areAllApiKeysConfigured() ? 'IA' : isOpenAIConfigured() ? 'OpenAI' : isFDCConfigured() ? 'FDC' : 'Offline'}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Flame size={16} className="text-orange-500" />
-                <span className="text-sm font-semibold text-gray-800">{trackedDays}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 bg-white border-b">
-          <div className="flex space-x-2 overflow-x-auto">
-            {days.map((day) => (
-              <div
-                key={day.day}
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium
-                  ${day.isToday ? 'bg-gray-800 text-white' : day.hasData ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-400'}`}
-              >
-                {day.day}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="text-center mb-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-2">Resumen Nutricional</h2>
-              <CalorieDonutChart consumed={totalCalories} goal={dailyGoals.calories} />
-              <div className="mt-2">
-                <div className="text-xl font-bold text-gray-800">{totalCalories} kcal</div>
-                <div className="text-sm text-gray-500">
-                  {Math.max(0, dailyGoals.calories - totalCalories)} restantes
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-4">
-              <MacroBar label="Proteínas" consumed={totalProtein} goal={dailyGoals.protein} color="bg-red-400" />
-              <MacroBar label="Carbohidratos" consumed={totalCarbs} goal={dailyGoals.carbs} color="bg-yellow-400" />
-              <MacroBar label="Grasas" consumed={totalFat} goal={dailyGoals.fat} color="bg-green-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm">
-            <div className="p-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-800">Comidas de Hoy</h3>
-            </div>
-            
-            {meals.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
-                <p className="mb-2">No hay comidas registradas</p>
-                <button
-                  onClick={() => setShowQuickActions(true)}
-                  className="text-gray-800 text-sm font-medium"
-                >
-                  Agregar primera comida
-                </button>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {meals.map((meal) => (
-                  <div key={meal.id} className="p-4 flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-800">{meal.name}</h4>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-sm text-gray-500 flex items-center">
-                          <Clock size={12} className="mr-1" />
-                          {meal.time}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          P: {meal.protein}g • C: {meal.carbs}g • G: {meal.fat}g
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-gray-800">{meal.calories}</div>
-                      <div className="text-xs text-gray-500">kcal</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {!areAllApiKeysConfigured() && (
-            <div className="space-y-3">
-              {!isOpenAIConfigured() && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">OpenAI API</p>
-                      <p className="text-xs text-gray-600">Para análisis con Eva</p>
-                    </div>
-                    <button
-                      onClick={() => setShowApiKeyInput(true)}
-                      className="text-xs bg-gray-800 text-white px-3 py-1 rounded-full"
-                    >
-                      Configurar
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {!isFDCConfigured() && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">FoodData Central API</p>
-                      <p className="text-xs text-gray-600">Para búsqueda de alimentos</p>
-                    </div>
-                    <button
-                      onClick={() => setShowFdcApiKeyInput(true)}
-                      className="text-xs bg-gray-800 text-white px-3 py-1 rounded-full"
-                    >
-                      Configurar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Modales de configuración */}
-        {showApiKeyInput && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="text-lg font-semibold mb-4">Configurar OpenAI API</h3>
-              <input
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent mb-4"
-              />
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowApiKeyInput(false)}
-                  className="flex-1 py-2 text-gray-600 border border-gray-300 rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => setShowApiKeyInput(false)}
-                  className="flex-1 py-2 bg-gray-800 text-white rounded-xl"
-                >
-                  Guardar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showFdcApiKeyInput && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-              <h3 className="text-lg font-semibold mb-2">Configurar FoodData Central</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Obtén tu API Key gratuita en: api.nal.usda.gov/fdc/
-              </p>
-              <input
-                type="password"
-                placeholder="API Key de USDA FoodData Central"
-                value={fdcApiKey}
-                onChange={(e) => setFdcApiKey(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent mb-4"
-              />
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowFdcApiKeyInput(false)}
-                  className="flex-1 py-2 text-gray-600 border border-gray-300 rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => setShowFdcApiKeyInput(false)}
-                  className="flex-1 py-2 bg-gray-800 text-white rounded-xl"
-                >
-                  Guardar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Botones flotantes */}
-        <div className="fixed bottom-24 right-6 z-40">
-          <button
-            onClick={() => setShowQuickActions(!showQuickActions)}
-            className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
-              showQuickActions ? 'bg-gray-600 rotate-45' : 'bg-gray-800 hover:bg-gray-700'
-            } text-white`}
-          >
-            <Plus size={24} />
-          </button>
-        </div>
-
-        {showQuickActions && (
-          <div className="fixed bottom-24 right-6 z-30">
-            <div className="flex flex-col items-end space-y-3 mb-16">
-              <button onClick={() => fileInputRef.current?.click()} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-200 hover:border-gray-300 transition-all" title="Analizar con IA">
-                <Camera size={20} className="text-gray-600" />
-              </button>
-              <button onClick={() => { setActiveTab('search'); setShowQuickActions(false); }} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-200 hover:border-gray-300 transition-all" title="Buscar alimento">
-                <Search size={20} className="text-gray-600" />
-              </button>
-              <button onClick={() => { setActiveTab('recent'); setShowQuickActions(false); }} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-200 hover:border-gray-300 transition-all" title="Recientes">
-                <History size={20} className="text-gray-600" />
-              </button>
-              <button onClick={() => { setActiveTab('barcode'); setShowQuickActions(false); }} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-200 hover:border-gray-300 transition-all" title="Escanear código">
-                <Scan size={20} className="text-gray-600" />
-              </button>
-              <button onClick={() => { setActiveTab('workouts'); setShowQuickActions(false); }} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-200 hover:border-gray-300 transition-all" title="Ejercicio">
-                <Dumbbell size={20} className="text-gray-600" />
-              </button>
-              <button onClick={() => { setActiveTab('assistant'); setShowQuickActions(false); }} className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-gray-200 hover:border-gray-300 transition-all" title="Pregunta a Eva">
-                <Bot size={20} className="text-gray-600" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <input type="file" accept="image/*" onChange={handleFileSelect} ref={fileInputRef} className="hidden" />
-      </div>
-    );
+  const sendMessageToAI = async (message) => {
+    setIsSendingMessage(true);
+    const response = await sendMessageToAIAPI(message);
+    if (response) {
+      setChatMessages(prev => [...prev, response]);
+    }
+    setIsSendingMessage(false);
   };
 
-  const SearchScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveTab('home')} className="p-2 text-gray-600">
-            <X size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-800">Buscar Alimento</h2>
-        </div>
-      </div>
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
 
-      <div className="p-6 space-y-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <div className="flex space-x-2 mb-4">
-            <input
-              type="text"
-              placeholder="Buscar alimento..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearchFoodByName(searchQuery)}
-              className="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-            />
-            <button
-              onClick={() => handleSearchFoodByName(searchQuery)}
-              disabled={!searchQuery || isSearching || !isFDCConfigured()}
-              className="px-4 py-3 bg-gray-800 text-white rounded-xl disabled:opacity-50"
-            >
-              <Search size={20} />
-            </button>
-          </div>
+    const userMessage = { id: Date.now(), text: newMessage, sender: 'user' };
+    setChatMessages(prev => [...prev, userMessage]);
+    
+    const messageToSend = newMessage;
+    setNewMessage('');
+    
+    await sendMessageToAI(messageToSend);
+  };
 
-          {searchResults.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-700">Resultados:</h4>
-              {searchResults.map((food, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleGetFoodNutrition(food.fdcId)}
-                  className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                >
-                  <div className="font-medium text-gray-800">{food.description}</div>
-                  <div className="text-sm text-gray-500">{food.dataType}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const handleAnalyzeImage = async () => {
+    if (!capturedImage) return;
+    
+    const result = await analyzeImageWithAI(capturedImage);
+    if (result && result.foods && result.foods.length > 0) {
+      setActiveTab('search');
+      setSearchResults(result.foods);
+    }
+    setCapturedImage(null);
+  };
 
-  const RecentScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveTab('home')} className="p-2 text-gray-600">
-            <X size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-800">Alimentos Recientes</h2>
-        </div>
-      </div>
+  const handleBarcodeSearch = async () => {
+    if (!scannedBarcode.trim()) return;
+    await searchByBarcode(scannedBarcode);
+    setScannedBarcode('');
+    setShowScanner(false);
+    setActiveTab('nutrition');
+  };
 
-      <div className="p-6">
-        <div className="bg-white rounded-2xl shadow-sm">
-          <div className="divide-y divide-gray-100">
-            {recentFoods.map((food, index) => (
-              <button
-                key={index}
-                onClick={() => addMealFromRecent(food)}
-                className="w-full p-4 text-left hover:bg-gray-50 flex items-center justify-between"
-              >
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-800">{food.name}</h4>
-                  <div className="text-xs text-gray-500 mt-1">
-                    P: {food.protein}g • C: {food.carbs}g • G: {food.fat}g
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-gray-800">{food.calories}</div>
-                  <div className="text-xs text-gray-500">kcal</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const BarcodeScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveTab('home')} className="p-2 text-gray-600">
-            <X size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-800">Escanear Código</h2>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          {isScanningBarcode ? (
-            <div className="space-y-4">
-              <video ref={videoRef} autoPlay playsInline className="w-full h-48 bg-black rounded-lg" />
-              <button onClick={stopBarcodeScanner} className="w-full bg-red-500 text-white py-3 rounded-xl font-medium">
-                Detener Escáner
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <button onClick={startBarcodeScanner} className="w-full bg-gray-800 text-white py-3 rounded-xl font-medium flex items-center justify-center">
-                <Camera className="mr-2" size={20} />
-                Activar Cámara
-              </button>
-              
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="O ingresa código manualmente"
-                  value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearchByBarcode(barcodeInput)}
-                  className="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                />
-                <button
-                  onClick={() => handleSearchByBarcode(barcodeInput)}
-                  disabled={!barcodeInput || isAnalyzing}
-                  className="px-4 py-3 bg-gray-800 text-white rounded-xl disabled:opacity-50"
-                >
-                  <Search size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  const NutritionScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveTab('home')} className="p-2 text-gray-600">
-            <X size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-800">Agregar Comida</h2>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            {isAnalyzing ? 'Procesando...' : 'Información Nutricional'}
-          </h3>
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Nombre de la comida"
-              value={newMeal.name}
-              onChange={(e) => setNewMeal({...newMeal, name: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-            />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="number"
-                placeholder="Calorías"
-                value={newMeal.calories}
-                onChange={(e) => setNewMeal({...newMeal, calories: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-              <input
-                type="number"
-                placeholder="Porción (g)"
-                value={newMeal.serving}
-                onChange={(e) => setNewMeal({...newMeal, serving: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <input
-                type="number"
-                step="0.1"
-                placeholder="Proteínas (g)"
-                value={newMeal.protein}
-                onChange={(e) => setNewMeal({...newMeal, protein: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-              <input
-                type="number"
-                step="0.1"
-                placeholder="Carbohidratos (g)"
-                value={newMeal.carbs}
-                onChange={(e) => setNewMeal({...newMeal, carbs: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-              <input
-                type="number"
-                step="0.1"
-                placeholder="Grasas (g)"
-                value={newMeal.fat}
-                onChange={(e) => setNewMeal({...newMeal, fat: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-            </div>
-            
-            <button 
-              onClick={addMeal}
-              disabled={!newMeal.name || !newMeal.calories}
-              className="w-full bg-gray-800 text-white py-3 rounded-xl font-medium flex items-center justify-center disabled:opacity-50"
-            >
-              <Plus className="mr-2" size={20} />
-              Agregar Comida
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const WorkoutsScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveTab('home')} className="p-2 text-gray-600">
-            <X size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-800">Agregar Ejercicio</h2>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Nuevo Entrenamiento</h3>
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Nombre del entrenamiento"
-              value={newWorkout.name}
-              onChange={(e) => setNewWorkout({...newWorkout, name: e.target.value})}
-              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Duración (ej: 45 min)"
-                value={newWorkout.duration}
-                onChange={(e) => setNewWorkout({...newWorkout, duration: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-              <input
-                type="number"
-                placeholder="Nº ejercicios"
-                value={newWorkout.exercises}
-                onChange={(e) => setNewWorkout({...newWorkout, exercises: e.target.value})}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-            </div>
-            <button 
-              onClick={addWorkout}
-              disabled={!newWorkout.name || !newWorkout.duration}
-              className="w-full bg-gray-800 text-white py-3 rounded-xl font-medium flex items-center justify-center disabled:opacity-50"
-            >
-              <Plus className="mr-2" size={20} />
-              Agregar Entrenamiento
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm">
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800">Entrenamientos Recientes</h3>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {workouts.map((workout) => (
-              <div key={workout.id} className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-gray-800">{workout.name}</h4>
-                  <div className="flex items-center text-gray-600">
-                    <Zap size={16} className="mr-1" />
-                    <span className="font-semibold">{workout.calories} cal</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4 text-sm text-gray-500">
-                  <span>{workout.duration}</span>
-                  <span>{workout.exercises} ejercicios</span>
-                  <span>{workout.date}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const AssistantScreen = () => (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveTab('home')} className="p-2 text-gray-600">
-            <X size={20} />
-          </button>
-          <h2 className="text-xl font-semibold text-gray-800">Pregunta a Eva</h2>
-        </div>
-      </div>
-
-      <div className="flex-1 p-6">
-        <div className="bg-white rounded-2xl shadow-sm h-full flex flex-col">
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {chatMessages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                  msg.type === 'user' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-800'
-                }`}>
-                  <p className="text-sm">{msg.message}</p>
-                </div>
-              </div>
-            ))}
-            
-            {isThinking && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 px-4 py-2 rounded-2xl">
-                  <p className="text-sm text-gray-600">Eva está pensando...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                placeholder="Pregunta sobre nutrición, entrenamientos..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-              <button 
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isThinking || !isOpenAIConfigured()}
-                className="bg-gray-800 text-white p-3 rounded-xl disabled:opacity-50"
-              >
-                <Send size={20} />
-              </button>
-            </div>
-            {!isOpenAIConfigured() && (
-              <p className="text-sm text-gray-500 mt-2">Configura tu API Key de OpenAI para chatear con Eva</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const ProgressScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <h2 className="text-xl font-semibold text-gray-800">Progreso</h2>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <div className="bg-white rounded-2xl p-2 shadow-sm">
-          <div className="flex">
-            <button
-              onClick={() => setShowProgressDetail('nutrition')}
-              className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${
-                showProgressDetail === 'nutrition' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Nutrición
-            </button>
-            <button
-              onClick={() => setShowProgressDetail('workout')}
-              className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all ${
-                showProgressDetail === 'workout' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Entrenamiento
-            </button>
-          </div>
-        </div>
-
-        {showProgressDetail === 'nutrition' ? (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Calorías Semanales</h3>
-              <div className="space-y-2">
-                {nutritionProgress.map((day, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 w-12">{day.day}</span>
-                    <div className="flex-1 mx-4">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-gray-600 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, (day.calories / dailyGoals.calories) * 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium text-gray-800 w-16 text-right">{day.calories}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Distribución de Macros Hoy</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Proteínas</span>
-                  <div className="flex-1 mx-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-red-400 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, (totalProtein / dailyGoals.protein) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-800">{totalProtein}g</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Carbohidratos</span>
-                  <div className="flex-1 mx-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, (totalCarbs / dailyGoals.carbs) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-800">{totalCarbs}g</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Grasas</span>
-                  <div className="flex-1 mx-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-green-400 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, (totalFat / dailyGoals.fat) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-800">{totalFat}g</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Entrenamientos Semanales</h3>
-              <div className="space-y-2">
-                {workoutProgress.map((day, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 w-12">{day.day}</span>
-                    <div className="flex-1 mx-4">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-gray-600 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, (day.duration / 90) * 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium text-gray-800 w-16 text-right">{day.duration}min</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Estadísticas de la Semana</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-800">
-                    {workoutProgress.reduce((sum, day) => sum + day.duration, 0)}
-                  </div>
-                  <div className="text-sm text-gray-600">Minutos totales</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-800">
-                    {workoutProgress.reduce((sum, day) => sum + day.calories, 0)}
-                  </div>
-                  <div className="text-sm text-gray-600">Calorías quemadas</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-800">
-                    {workoutProgress.filter(day => day.duration > 0).length}
-                  </div>
-                  <div className="text-sm text-gray-600">Días activos</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-800">
-                    {Math.round(workoutProgress.reduce((sum, day) => sum + day.duration, 0) / 7)}
-                  </div>
-                  <div className="text-sm text-gray-600">Promedio diario</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const ProfileScreen = () => (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-6 py-4 shadow-sm">
-        <h2 className="text-xl font-semibold text-gray-800">Perfil</h2>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-              <UserCircle size={32} className="text-gray-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">{userProfile.name}</h3>
-              <p className="text-sm text-gray-600">Objetivo: Mantener peso</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-lg font-bold text-gray-800">{userProfile.weight}kg</div>
-              <div className="text-xs text-gray-600">Peso</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-800">{userProfile.height}cm</div>
-              <div className="text-xs text-gray-600">Altura</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-800">{userProfile.age}</div>
-              <div className="text-xs text-gray-600">Años</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Metas Diarias</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Calorías objetivo</span>
-              <span className="font-semibold text-gray-800">{dailyGoals.calories} kcal</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Proteínas</span>
-              <span className="font-semibold text-gray-800">{dailyGoals.protein}g</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Carbohidratos</span>
-              <span className="font-semibold text-gray-800">{dailyGoals.carbs}g</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Grasas</span>
-              <span className="font-semibold text-gray-800">{dailyGoals.fat}g</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm">
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800">Configuración</h3>
-          </div>
-          <div className="divide-y divide-gray-100">
-            <button
-              onClick={() => setShowApiKeyInput(true)}
-              className="w-full p-4 flex items-center justify-between hover:bg-gray-50"
-            >
-              <div className="flex items-center space-x-3">
-                <Bot size={20} className="text-gray-600" />
-                <span className="text-gray-800">API OpenAI</span>
-              </div>
-              <ChevronRight size={16} className="text-gray-400" />
-            </button>
-            
-            <button
-              onClick={() => setShowFdcApiKeyInput(true)}
-              className="w-full p-4 flex items-center justify-between hover:bg-gray-50"
-            >
-              <div className="flex items-center space-x-3">
-                <Search size={20} className="text-gray-600" />
-                <span className="text-gray-800">API FoodData Central</span>
-              </div>
-              <ChevronRight size={16} className="text-gray-400" />
-            </button>
-            
-            <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50">
-              <div className="flex items-center space-x-3">
-                <Target size={20} className="text-gray-600" />
-                <span className="text-gray-800">Ajustar Metas</span>
-              </div>
-              <ChevronRight size={16} className="text-gray-400" />
-            </button>
-            
-            <button className="w-full p-4 flex items-center justify-between hover:bg-gray-50">
-              <div className="flex items-center space-x-3">
-                <Settings size={20} className="text-gray-600" />
-                <span className="text-gray-800">Configuración General</span>
-              </div>
-              <ChevronRight size={16} className="text-gray-400" />
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">Sobre EVA FIT</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Tu asistente personal de fitness impulsado por inteligencia artificial.
-          </p>
-          <p className="text-xs text-gray-500">Versión 1.0.0</p>
-        </div>
-      </div>
-    </div>
-  );
-
+  // Componente para renderizar cada pantalla
   const renderScreen = () => {
     switch (activeTab) {
       case 'home':
-        return <HomeScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <div className="text-center mb-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">Resumen Nutricional</h2>
+                <CalorieDonutChart consumed={totalCalories} goal={dailyGoals.calories} />
+                <div className="mt-2">
+                  <div className="text-xl font-bold text-gray-800">{totalCalories} kcal</div>
+                  <div className="text-sm text-gray-500">
+                    {Math.max(0, dailyGoals.calories - totalCalories)} restantes
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <MacroBar
+                  label="Proteína"
+                  current={totalProtein}
+                  goal={dailyGoals.protein}
+                  color="bg-blue-500"
+                />
+                <MacroBar
+                  label="Carbohidratos"
+                  current={totalCarbs}
+                  goal={dailyGoals.carbs}
+                  color="bg-green-500"
+                />
+                <MacroBar
+                  label="Grasas"
+                  current={totalFat}
+                  goal={dailyGoals.fat}
+                  color="bg-orange-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Comidas de Hoy</h3>
+              {mealsLoading ? (
+                <div className="text-center py-4">
+                  <div className="text-gray-500">Cargando comidas...</div>
+                </div>
+              ) : meals.length === 0 ? (
+                <div className="text-center py-4">
+                  <div className="text-gray-500 mb-2">No has registrado comidas hoy</div>
+                  <button
+                    onClick={() => setShowQuickActions(true)}
+                    className="text-emerald-600 font-medium hover:text-emerald-700"
+                  >
+                    Agregar primera comida
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {meals.map((meal) => (
+                    <div key={meal.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="font-medium text-gray-800">{meal.name}</div>
+                        <div className="text-sm text-gray-600">
+                          {meal.calories} kcal • {meal.protein}g proteína
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteMeal(meal.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {recentFoods.length > 0 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Comidas Recientes</h3>
+                <div className="space-y-2">
+                  {recentFoods.slice(0, 3).map((food, index) => (
+                    <button
+                      key={index}
+                      onClick={() => addMealFromRecent(food)}
+                      className="w-full text-left p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="font-medium text-gray-800">{food.name}</div>
+                      <div className="text-sm text-gray-600">{food.calories} kcal</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case 'search':
-        return <SearchScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Buscar Alimentos</h2>
+              
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar alimento..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchFoodByName(searchQuery)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+              </div>
+
+              <button
+                onClick={() => searchFoodByName(searchQuery)}
+                disabled={isSearching || !searchQuery.trim()}
+                className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isSearching ? 'Buscando...' : 'Buscar'}
+              </button>
+
+              {!areAllApiKeysConfigured && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="text-yellow-800 text-sm">
+                    Para usar la búsqueda necesitas configurar las API keys.
+                    <button
+                      onClick={() => setActiveTab('profile')}
+                      className="ml-2 text-yellow-900 font-medium hover:underline"
+                    >
+                      Configurar ahora
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Resultados</h3>
+                <div className="space-y-3">
+                  {searchResults.map((food, index) => (
+                    <button
+                      key={index}
+                      onClick={() => getFoodNutrition(food.fdcId)}
+                      className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+                    >
+                      <div className="font-medium text-gray-800">{food.description}</div>
+                      {food.brandOwner && (
+                        <div className="text-sm text-gray-600">{food.brandOwner}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case 'recent':
-        return <RecentScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Comidas Recientes</h2>
+              {recentFoods.length === 0 ? (
+                <div className="text-center py-8">
+                  <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <div className="text-gray-500">No hay comidas recientes</div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentFoods.map((food, index) => (
+                    <div key={index} className="p-4 border border-gray-200 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-800">{food.name}</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {food.calories} kcal • {food.protein}g proteína • {food.carbs}g carbohidratos • {food.fat}g grasas
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => addMealFromRecent(food)}
+                          className="ml-4 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                          Agregar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       case 'barcode':
-        return <BarcodeScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Escanear Código de Barras</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Código de barras
+                  </label>
+                  <input
+                    type="text"
+                    value={scannedBarcode}
+                    onChange={(e) => setScannedBarcode(e.target.value)}
+                    placeholder="Ingresa el código de barras"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                </div>
+
+                <button
+                  onClick={handleBarcodeSearch}
+                  disabled={!scannedBarcode.trim() || isSearching}
+                  className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSearching ? 'Buscando...' : 'Buscar Producto'}
+                </button>
+
+                {!isFDCConfigured && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="text-yellow-800 text-sm">
+                      Para usar el escáner necesitas configurar la API key de FoodData Central.
+                      <button
+                        onClick={() => setActiveTab('profile')}
+                        className="ml-2 text-yellow-900 font-medium hover:underline"
+                      >
+                        Configurar ahora
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
       case 'nutrition':
-        return <NutritionScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            {selectedFood ? (
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Información Nutricional</h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium text-gray-800 mb-2">{selectedFood.description}</h3>
+                    {selectedFood.brandOwner && (
+                      <p className="text-sm text-gray-600">{selectedFood.brandOwner}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Calorías</div>
+                      <div className="text-xl font-bold text-gray-800">{selectedFood.calories || 0}</div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Proteína</div>
+                      <div className="text-xl font-bold text-gray-800">{selectedFood.protein || 0}g</div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Carbohidratos</div>
+                      <div className="text-xl font-bold text-gray-800">{selectedFood.carbs || 0}g</div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Grasas</div>
+                      <div className="text-xl font-bold text-gray-800">{selectedFood.fat || 0}g</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Cantidad (gramos)
+                      </label>
+                      <input
+                        type="number"
+                        value={newMeal.quantity}
+                        onChange={(e) => setNewMeal({...newMeal, quantity: parseFloat(e.target.value) || 0})}
+                        placeholder="100"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setNewMeal({
+                          ...newMeal,
+                          name: selectedFood.description,
+                          calories: Math.round((selectedFood.calories || 0) * (newMeal.quantity / 100)),
+                          protein: Math.round((selectedFood.protein || 0) * (newMeal.quantity / 100)),
+                          carbs: Math.round((selectedFood.carbs || 0) * (newMeal.quantity / 100)),
+                          fat: Math.round((selectedFood.fat || 0) * (newMeal.quantity / 100))
+                        });
+                        addMeal();
+                        setSelectedFood(null);
+                      }}
+                      className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      Agregar a Mis Comidas
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-6 shadow-sm">
+                <div className="text-center py-8">
+                  <Target className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <div className="text-gray-500">Selecciona un alimento para ver su información nutricional</div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case 'workouts':
-        return <WorkoutsScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Entrenamientos</h2>
+              
+              {workouts.length === 0 ? (
+                <div className="text-center py-8">
+                  <Dumbbell className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <div className="text-gray-500">No hay entrenamientos registrados</div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {workouts.map((workout) => (
+                    <div key={workout.id} className="p-4 border border-gray-200 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-gray-800">{workout.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {workout.duration} min • {workout.calories} kcal quemadas
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-500">{workout.date}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       case 'assistant':
-        return <AssistantScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm h-96 flex flex-col">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Asistente Nutricional</h2>
+              
+              <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                {chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`flex items-start space-x-2 max-w-xs ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        message.sender === 'user' ? 'bg-emerald-600' : 'bg-gray-600'
+                      }`}>
+                        {message.sender === 'user' ? 
+                          <User className="w-4 h-4 text-white" /> : 
+                          <Bot className="w-4 h-4 text-white" />
+                        }
+                      </div>
+                      <div className={`p-3 rounded-lg ${
+                        message.sender === 'user' 
+                          ? 'bg-emerald-600 text-white' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        <div className="text-sm">{message.text}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {isSendingMessage && (
+                  <div className="flex justify-start">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="bg-gray-100 p-3 rounded-lg">
+                        <div className="text-sm text-gray-600">EVA está escribiendo...</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !isSendingMessage && handleSendMessage()}
+                  placeholder="Pregunta sobre nutrición..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  disabled={isSendingMessage}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={isSendingMessage || !newMessage.trim()}
+                  className="bg-emerald-600 text-white p-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+
+              {!isOpenAIConfigured && (
+                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="text-yellow-800 text-sm">
+                    Para usar el asistente necesitas configurar la API key de OpenAI.
+                    <button
+                      onClick={() => setActiveTab('profile')}
+                      className="ml-2 text-yellow-900 font-medium hover:underline"
+                    >
+                      Configurar ahora
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Botón de análisis de imagen */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Análisis de Imágenes</h3>
+              
+              <div className="space-y-4">
+                <div className="flex space-x-3">
+                  <button
+                    onClick={startCamera}
+                    className="flex-1 bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span>Tomar Foto</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <Scan className="w-5 h-5" />
+                    <span>Subir Imagen</span>
+                  </button>
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+
+                {capturedImage && (
+                  <div className="space-y-4">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                      <img src={capturedImage} alt="Captured" className="w-full h-48 object-cover rounded-lg" />
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={handleAnalyzeImage}
+                        disabled={isAnalyzing}
+                        className="flex-1 bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isAnalyzing ? 'Analizando...' : 'Analizar Imagen'}
+                      </button>
+                      
+                      <button
+                        onClick={() => setCapturedImage(null)}
+                        className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!isOpenAIConfigured && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="text-yellow-800 text-sm">
+                      Para usar el análisis de imágenes necesitas configurar la API key de OpenAI.
+                      <button
+                        onClick={() => setActiveTab('profile')}
+                        className="ml-2 text-yellow-900 font-medium hover:underline"
+                      >
+                        Configurar ahora
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
       case 'progress':
-        return <ProgressScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-800 mb-6">Progreso Diario</h2>
+              
+              <div className="text-center mb-6">
+                <CalorieDonutChart consumed={totalCalories} goal={dailyGoals.calories} />
+                <div className="mt-2">
+                  <div className="text-xl font-bold text-gray-800">{totalCalories} kcal</div>
+                  <div className="text-sm text-gray-500">
+                    de {dailyGoals.calories} kcal objetivo
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <MacroBar
+                  label="Proteína"
+                  current={totalProtein}
+                  goal={dailyGoals.protein}
+                  color="bg-blue-500"
+                />
+                <MacroBar
+                  label="Carbohidratos"
+                  current={totalCarbs}
+                  goal={dailyGoals.carbs}
+                  color="bg-green-500"
+                />
+                <MacroBar
+                  label="Grasas"
+                  current={totalFat}
+                  goal={dailyGoals.fat}
+                  color="bg-orange-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Estadísticas</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-emerald-600">{meals.length}</div>
+                  <div className="text-sm text-gray-600">Comidas registradas</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-600">{workouts.length}</div>
+                  <div className="text-sm text-gray-600">Entrenamientos</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {Math.round((totalCalories / dailyGoals.calories) * 100)}%
+                  </div>
+                  <div className="text-sm text-gray-600">Meta calórica</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {workouts.reduce((total, workout) => total + workout.calories, 0)}
+                  </div>
+                  <div className="text-sm text-gray-600">Kcal quemadas</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'profile':
-        return <ProfileScreen />;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-800 mb-6">Configuración</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-md font-semibold text-gray-800 mb-4">Objetivos Diarios</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Calorías objetivo
+                      </label>
+                      <input
+                        type="number"
+                        value={dailyGoals.calories}
+                        onChange={(e) => updateDailyGoals({...dailyGoals, calories: parseInt(e.target.value) || 0})}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Proteína objetivo (g)
+                      </label>
+                      <input
+                        type="number"
+                        value={dailyGoals.protein}
+                        onChange={(e) => updateDailyGoals({...dailyGoals, protein: parseInt(e.target.value) || 0})}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Carbohidratos objetivo (g)
+                      </label>
+                      <input
+                        type="number"
+                        value={dailyGoals.carbs}
+                        onChange={(e) => updateDailyGoals({...dailyGoals, carbs: parseInt(e.target.value) || 0})}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Grasas objetivo (g)
+                      </label>
+                      <input
+                        type="number"
+                        value={dailyGoals.fat}
+                        onChange={(e) => updateDailyGoals({...dailyGoals, fat: parseInt(e.target.value) || 0})}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-md font-semibold text-gray-800 mb-4">API Keys</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          OpenAI API Key
+                        </label>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          isOpenAIConfigured ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {isOpenAIConfigured ? 'Configurada' : 'No configurada'}
+                        </span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <input
+                          type={showApiKeyInput ? 'text' : 'password'}
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder="sk-..."
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+                          className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          {showApiKeyInput ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          FoodData Central API Key
+                        </label>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          isFDCConfigured ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {isFDCConfigured ? 'Configurada' : 'No configurada'}
+                        </span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <input
+                          type={showFdcApiKeyInput ? 'text' : 'password'}
+                          value={fdcApiKey}
+                          onChange={(e) => setFdcApiKey(e.target.value)}
+                          placeholder="DEMO_KEY o tu API key"
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={() => setShowFdcApiKeyInput(!showFdcApiKeyInput)}
+                          className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          {showFdcApiKeyInput ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-200">
+                  <button
+                    onClick={refreshMeals}
+                    className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <Activity className="w-5 h-5" />
+                    <span>Refrescar Datos</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
-        return <HomeScreen />;
+        return <div>Pantalla no encontrada</div>;
     }
   };
 
   return (
-    <div className="max-w-md mx-auto bg-gray-50 min-h-screen">
-      {renderScreen()}
-      
-      {!['search', 'recent', 'barcode', 'nutrition', 'workouts', 'assistant'].includes(activeTab) && (
-        <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md bg-white border-t border-gray-200">
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('home')}
-              className={`flex-1 py-3 flex flex-col items-center space-y-1 ${
-                activeTab === 'home' ? 'text-gray-800' : 'text-gray-400'
-              }`}
-            >
-              <Home size={20} />
-              <span className="text-xs">Inicio</span>
-            </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Modal de cámara */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Tomar Foto</h3>
+              <button onClick={stopCamera}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
             
-            <button
-              onClick={() => setActiveTab('progress')}
-              className={`flex-1 py-3 flex flex-col items-center space-y-1 ${
-                activeTab === 'progress' ? 'text-gray-800' : 'text-gray-400'
-              }`}
-            >
-              <BarChart3 size={20} />
-              <span className="text-xs">Progreso</span>
-            </button>
-            
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`flex-1 py-3 flex flex-col items-center space-y-1 ${
-                activeTab === 'profile' ? 'text-gray-800' : 'text-gray-400'
-              }`}
-            >
-              <UserCircle size={20} />
-              <span className="text-xs">Perfil</span>
-            </button>
+            <div className="space-y-4">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-64 bg-gray-200 rounded-lg object-cover"
+              />
+              
+              <button
+                onClick={captureImage}
+                className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                Capturar
+              </button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Canvas oculto para captura */}
+      <canvas ref={canvasRef} className="hidden" />
+
+
+      {/* Modal de acciones rápidas */}
       {showQuickActions && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-20 z-20"
-          onClick={() => setShowQuickActions(false)}
-        />
+        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-end justify-center">
+          <div className="bg-white rounded-t-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">Agregar Comida</h3>
+              <button onClick={() => setShowQuickActions(false)}>
+                <X className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setActiveTab('search');
+                  setShowQuickActions(false);
+                }}
+                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+              >
+                <Search className="w-6 h-6 text-emerald-600" />
+                <span className="font-medium text-emerald-700">Buscar Alimento</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setActiveTab('barcode');
+                  setShowQuickActions(false);
+                }}
+                className="w-full flex items-center space-x-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+              >
+                <Scan className="w-6 h-6 text-blue-600" />
+                <span className="font-medium text-blue-700">Escanear Código</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setActiveTab('assistant');
+                  setShowQuickActions(false);
+                }}
+                className="w-full flex items-center space-x-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+              >
+                <Camera className="w-6 h-6 text-purple-600" />
+                <span className="font-medium text-purple-700">Foto de Comida</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* Contenido principal */}
+      <div className="pb-20">
+        {renderScreen()}
+      </div>
+
+      {/* Botón flotante */}
+      <button
+        onClick={() => setShowQuickActions(true)}
+        className="fixed bottom-24 right-6 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 transition-all duration-200 flex items-center justify-center z-30"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
+      {/* Navegación inferior - Diseño minimalista */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-2 z-20">
+        <div className="flex justify-around">
+          <button
+            onClick={() => setActiveTab('home')}
+            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
+              activeTab === 'home' 
+                ? 'text-emerald-600 bg-emerald-50' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Home className="w-6 h-6" />
+            <span className="text-xs mt-1">Inicio</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('progress')}
+            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
+              activeTab === 'progress' 
+                ? 'text-emerald-600 bg-emerald-50' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <TrendingUp className="w-6 h-6" />
+            <span className="text-xs mt-1">Progreso</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('assistant')}
+            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
+              activeTab === 'assistant' 
+                ? 'text-emerald-600 bg-emerald-50' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <MessageCircle className="w-6 h-6" />
+            <span className="text-xs mt-1">EVA</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
+              activeTab === 'profile' 
+                ? 'text-emerald-600 bg-emerald-50' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <UserCircle className="w-6 h-6" />
+            <span className="text-xs mt-1">Perfil</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
