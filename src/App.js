@@ -914,7 +914,6 @@ const EVAFitApp = () => {
       {/* Canvas oculto para captura */}
       <canvas ref={canvasRef} className="hidden" />
 
-
       {/* Modal de acciones rápidas */}
       {showQuickActions && (
         <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-end justify-center">
