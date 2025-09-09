@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Utensils, Dumbbell, Target, Plus, Home, MessageCircle, TrendingUp, Clock, Zap, Send, Bot, User, Scan, Search, X, Flame, Settings, ChevronRight, Activity, BarChart3, UserCircle, History } from 'lucide-react';
 import { useMeals } from './hooks/useMeals';
 import { useApiKeys } from './hooks/useApiKeys';
+import { useWorkouts } from './hooks/useWorkouts';
 import CalorieDonutChart from './components/CalorieDonutChart';
 import MacroBar from './components/MacroBar';
 
@@ -12,7 +13,7 @@ const EVAFitApp = () => {
     newMeal, setNewMeal, dailyGoals, setDailyGoals,
     totalCalories, totalProtein, totalCarbs, totalFat,
     nutritionProgress, addMeal: addMealHook, addMealFromRecent: addMealFromRecentHook,
-    isLoading: mealsLoading, error: mealsError, deleteMeal, refreshMeals, updateDailyGoals
+    isLoading: mealsLoading, error: mealsError, deleteMeal, refreshMeals, updateGoals
   } = useMeals();
 
   const {
@@ -23,12 +24,14 @@ const EVAFitApp = () => {
     sendMessageToAI: sendMessageToAIAPI, isOpenAIConfigured, isFDCConfigured, areAllApiKeysConfigured
   } = useApiKeys();
 
+  const {
+    workouts, isLoading: workoutsLoading, error: workoutsError,
+    totalCaloriesBurned, workoutStats, todaysWorkouts,
+    addWorkout, deleteWorkout, updateWorkout, refreshWorkouts
+  } = useWorkouts();
+
   // Estados locales para navegación y UI
   const [activeTab, setActiveTab] = useState('home');
-  const [workouts, setWorkouts] = useState([
-    { id: 1, name: 'Push-ups', duration: 15, calories: 120, date: new Date().toISOString().split('T')[0] },
-    { id: 2, name: 'Running', duration: 30, calories: 300, date: new Date().toISOString().split('T')[0] }
-  ]);
   
   // Estados para funcionalidades específicas
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -496,10 +499,22 @@ const EVAFitApp = () => {
             <div className="bg-white rounded-2xl p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Entrenamientos</h2>
               
-              {workouts.length === 0 ? (
+              {workoutsLoading ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500">Cargando entrenamientos...</div>
+                </div>
+              ) : workouts.length === 0 ? (
                 <div className="text-center py-8">
                   <Dumbbell className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <div className="text-gray-500">No hay entrenamientos registrados</div>
+                  <div className="text-gray-500 mb-2">No hay entrenamientos registrados</div>
+                  <button
+                    onClick={() => {
+                      console.log('Agregar entrenamiento');
+                    }}
+                    className="text-emerald-600 font-medium hover:text-emerald-700"
+                  >
+                    Registrar primer entrenamiento
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -512,12 +527,50 @@ const EVAFitApp = () => {
                             {workout.duration} min • {workout.calories} kcal quemadas
                           </div>
                         </div>
-                        <div className="text-sm text-gray-500">{workout.date}</div>
+                        <div className="flex items-center space-x-2">
+                          <div className="text-sm text-gray-500">{workout.date}</div>
+                          <button
+                            onClick={() => deleteWorkout(workout.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+
+              {workoutsError && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="text-red-800 text-sm">{workoutsError}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Estadísticas de entrenamientos */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Estadísticas de Entrenamiento</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-emerald-600">{workoutStats.totalWorkouts}</div>
+                  <div className="text-sm text-gray-600">Total entrenamientos</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-600">{totalCaloriesBurned}</div>
+                  <div className="text-sm text-gray-600">Calorías quemadas</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-orange-600">{workoutStats.averageCaloriesPerWorkout}</div>
+                  <div className="text-sm text-gray-600">Promedio por sesión</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">{workoutStats.totalDuration}</div>
+                  <div className="text-sm text-gray-600">Minutos totales</div>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -565,25 +618,6 @@ const EVAFitApp = () => {
                     </div>
                   </div>
                 )}
-              </div>
-
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !isSendingMessage && handleSendMessage()}
-                  placeholder="Pregunta sobre nutrición..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  disabled={isSendingMessage}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={isSendingMessage || !newMessage.trim()}
-                  className="bg-emerald-600 text-white p-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
               </div>
 
               {!isOpenAIConfigured && (
@@ -722,7 +756,7 @@ const EVAFitApp = () => {
                   <div className="text-sm text-gray-600">Comidas registradas</div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-blue-600">{workouts.length}</div>
+                  <div className="text-2xl font-bold text-blue-600">{workoutStats.totalWorkouts}</div>
                   <div className="text-sm text-gray-600">Entrenamientos</div>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg text-center">
@@ -733,7 +767,7 @@ const EVAFitApp = () => {
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {workouts.reduce((total, workout) => total + workout.calories, 0)}
+                    {totalCaloriesBurned}
                   </div>
                   <div className="text-sm text-gray-600">Kcal quemadas</div>
                 </div>
@@ -759,7 +793,7 @@ const EVAFitApp = () => {
                       <input
                         type="number"
                         value={dailyGoals.calories}
-                        onChange={(e) => updateDailyGoals({...dailyGoals, calories: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setDailyGoals({...dailyGoals, calories: parseInt(e.target.value) || 0})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       />
                     </div>
@@ -770,7 +804,7 @@ const EVAFitApp = () => {
                       <input
                         type="number"
                         value={dailyGoals.protein}
-                        onChange={(e) => updateDailyGoals({...dailyGoals, protein: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setDailyGoals({...dailyGoals, protein: parseInt(e.target.value) || 0})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       />
                     </div>
@@ -781,7 +815,7 @@ const EVAFitApp = () => {
                       <input
                         type="number"
                         value={dailyGoals.carbs}
-                        onChange={(e) => updateDailyGoals({...dailyGoals, carbs: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setDailyGoals({...dailyGoals, carbs: parseInt(e.target.value) || 0})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       />
                     </div>
@@ -792,7 +826,7 @@ const EVAFitApp = () => {
                       <input
                         type="number"
                         value={dailyGoals.fat}
-                        onChange={(e) => updateDailyGoals({...dailyGoals, fat: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setDailyGoals({...dailyGoals, fat: parseInt (e.target.value) || 0})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       />
                     </div>
@@ -919,7 +953,7 @@ const EVAFitApp = () => {
         <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-end justify-center">
           <div className="bg-white rounded-t-2xl w-full max-w-md p-6 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-800">Agregar Comida</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Acciones Rápidas</h3>
               <button onClick={() => setShowQuickActions(false)}>
                 <X className="w-6 h-6 text-gray-500" />
               </button>
@@ -942,10 +976,21 @@ const EVAFitApp = () => {
                   setActiveTab('barcode');
                   setShowQuickActions(false);
                 }}
-                className="w-full flex items-center space-x-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
               >
-                <Scan className="w-6 h-6 text-blue-600" />
-                <span className="font-medium text-blue-700">Escanear Código</span>
+                <Scan className="w-6 h-6 text-emerald-600" />
+                <span className="font-medium text-emerald-700">Escanear Código</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setActiveTab('workouts');
+                  setShowQuickActions(false);
+                }}
+                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+              >
+                <Dumbbell className="w-6 h-6 text-emerald-600" />
+                <span className="font-medium text-emerald-700">Registrar Ejercicio</span>
               </button>
               
               <button
@@ -953,10 +998,10 @@ const EVAFitApp = () => {
                   setActiveTab('assistant');
                   setShowQuickActions(false);
                 }}
-                className="w-full flex items-center space-x-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
               >
-                <Camera className="w-6 h-6 text-purple-600" />
-                <span className="font-medium text-purple-700">Foto de Comida</span>
+                <Camera className="w-6 h-6 text-emerald-600" />
+                <span className="font-medium text-emerald-700">Foto de Comida</span>
               </button>
             </div>
           </div>
