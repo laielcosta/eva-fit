@@ -4,6 +4,7 @@ import { useMeals } from './hooks/useMeals';
 import { useApiKeys } from './hooks/useApiKeys';
 import { useWorkouts } from './hooks/useWorkouts';
 import CalorieDonutChart from './components/CalorieDonutChart';
+import QuickActionsModal from './components/QuickActionsModal.js';
 import MacroBar from './components/MacroBar';
 
 const EVAFitApp = () => {
@@ -826,7 +827,7 @@ const EVAFitApp = () => {
                       <input
                         type="number"
                         value={dailyGoals.fat}
-                        onChange={(e) => setDailyGoals({...dailyGoals, fat: parseInt (e.target.value) || 0})}
+                        onChange={(e) => setDailyGoals({...dailyGoals, fat: parseInt(e.target.value) || 0})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       />
                     </div>
@@ -949,64 +950,11 @@ const EVAFitApp = () => {
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Modal de acciones rápidas */}
-      {showQuickActions && (
-        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-end justify-center">
-          <div className="bg-white rounded-t-2xl w-full max-w-md p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-800">Acciones Rápidas</h3>
-              <button onClick={() => setShowQuickActions(false)}>
-                <X className="w-6 h-6 text-gray-500" />
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setActiveTab('search');
-                  setShowQuickActions(false);
-                }}
-                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-              >
-                <Search className="w-6 h-6 text-emerald-600" />
-                <span className="font-medium text-emerald-700">Buscar Alimento</span>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setActiveTab('barcode');
-                  setShowQuickActions(false);
-                }}
-                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-              >
-                <Scan className="w-6 h-6 text-emerald-600" />
-                <span className="font-medium text-emerald-700">Escanear Código</span>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setActiveTab('workouts');
-                  setShowQuickActions(false);
-                }}
-                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-              >
-                <Dumbbell className="w-6 h-6 text-emerald-600" />
-                <span className="font-medium text-emerald-700">Registrar Ejercicio</span>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setActiveTab('assistant');
-                  setShowQuickActions(false);
-                }}
-                className="w-full flex items-center space-x-3 p-4 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-              >
-                <Camera className="w-6 h-6 text-emerald-600" />
-                <span className="font-medium text-emerald-700">Foto de Comida</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuickActionsModal
+        isVisible={showQuickActions}
+        onClose={() => setShowQuickActions(false)}
+        onNavigate={setActiveTab}
+      />
 
       {/* Contenido principal */}
       <div className="pb-20">
