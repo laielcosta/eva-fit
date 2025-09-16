@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, Scan, Dumbbell, Camera, X } from 'lucide-react';
+import { STYLES, COLORS, NAVIGATION } from '../services/constants';
 
 const QuickActionsModal = ({ isVisible, onClose, onNavigate }) => {
   if (!isVisible) return null;
@@ -9,54 +10,36 @@ const QuickActionsModal = ({ isVisible, onClose, onNavigate }) => {
     onClose();
   };
 
-  const actions = [
-    {
-      icon: Search,
-      label: 'Buscar Alimento',
-      screen: 'search',
-      color: 'emerald'
-    },
-    {
-      icon: Scan,
-      label: 'Escanear Código',
-      screen: 'barcode',
-      color: 'emerald'
-    },
-    {
-      icon: Dumbbell,
-      label: 'Registrar Ejercicio',
-      screen: 'workouts',
-      color: 'emerald'
-    },
-    {
-      icon: Camera,
-      label: 'Foto de Comida',
-      screen: 'assistant',
-      color: 'emerald'
-    }
-  ];
-
   return (
-    <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-end justify-center">
-      <div className="bg-white rounded-t-2xl w-full max-w-md p-6 space-y-4">
+    <div className={STYLES.modal}>
+      <div className={STYLES.modalContent}>
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-800">Acciones Rápidas</h3>
+          <h3 className={`text-lg font-semibold text-${COLORS.text.primary}`}>Acciones Rápidas</h3>
           <button onClick={onClose}>
-            <X className="w-6 h-6 text-gray-500" />
+            <X className={`w-6 h-6 text-${COLORS.text.muted}`} />
           </button>
         </div>
         
         <div className="space-y-3">
-          {actions.map((action, index) => (
-            <button
-              key={index}
-              onClick={() => handleAction(action.screen)}
-              className={`w-full flex items-center space-x-3 p-4 bg-${action.color}-50 hover:bg-${action.color}-100 rounded-lg transition-colors`}
-            >
-              <action.icon className={`w-6 h-6 text-${action.color}-600`} />
-              <span className={`font-medium text-${action.color}-700`}>{action.label}</span>
-            </button>
-          ))}
+          {NAVIGATION.quickActions.map((action, index) => {
+            const IconComponent = {
+              Search,
+              Scan, 
+              Dumbbell,
+              Camera
+            }[action.icon];
+            
+            return (
+              <button
+                key={action.id}
+                onClick={() => handleAction(action.screen)}
+                className={`w-full flex items-center space-x-3 p-4 bg-${COLORS.primaryShades[50]} hover:bg-${COLORS.primaryShades[100]} rounded-lg transition-colors`}
+              >
+                <IconComponent className={`w-6 h-6 text-${COLORS.primaryShades[600]}`} />
+                <span className={`font-medium text-${COLORS.primaryShades[700]}`}>{action.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
