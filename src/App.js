@@ -7,6 +7,7 @@ import CalorieDonutChart from './components/CalorieDonutChart';
 import MacroBar from './components/MacroBar';
 import QuickActionsModal from './components/QuickActionsModal';
 import HomeScreen from './screens/HomeScreen';
+import WorkoutsScreen from './screens/WorkoutsScreen';
 
 const EVAFitApp = () => {
   // Hooks de lógica de negocio
@@ -419,84 +420,14 @@ const EVAFitApp = () => {
 
       case 'workouts':
         return (
-          <div className="p-6 space-y-6">
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Entrenamientos</h2>
-              
-              {workoutsLoading ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-500">Cargando entrenamientos...</div>
-                </div>
-              ) : workouts.length === 0 ? (
-                <div className="text-center py-8">
-                  <Dumbbell className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <div className="text-gray-500 mb-2">No hay entrenamientos registrados</div>
-                  <button
-                    onClick={() => {
-                      console.log('Agregar entrenamiento');
-                    }}
-                    className="text-emerald-600 font-medium hover:text-emerald-700"
-                  >
-                    Registrar primer entrenamiento
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {workouts.map((workout) => (
-                    <div key={workout.id} className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium text-gray-800">{workout.name}</div>
-                          <div className="text-sm text-gray-600">
-                            {workout.duration} min • {workout.calories} kcal quemadas
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="text-sm text-gray-500">{workout.date}</div>
-                          <button
-                            onClick={() => deleteWorkout(workout.id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {workoutsError && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="text-red-800 text-sm">{workoutsError}</div>
-                </div>
-              )}
-            </div>
-
-            {/* Estadísticas de entrenamientos */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Estadísticas de Entrenamiento</h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-emerald-600">{workoutStats.totalWorkouts}</div>
-                  <div className="text-sm text-gray-600">Total entrenamientos</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-blue-600">{totalCaloriesBurned}</div>
-                  <div className="text-sm text-gray-600">Calorías quemadas</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-orange-600">{workoutStats.averageCaloriesPerWorkout}</div>
-                  <div className="text-sm text-gray-600">Promedio por sesión</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-green-600">{workoutStats.totalDuration}</div>
-                  <div className="text-sm text-gray-600">Minutos totales</div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <WorkoutsScreen
+            workouts={workouts}
+            workoutsLoading={workoutsLoading}
+            workoutsError={workoutsError}
+            workoutStats={workoutStats}
+            totalCaloriesBurned={totalCaloriesBurned}
+            deleteWorkout={deleteWorkout}
+          />
         );
 
       case 'assistant':
