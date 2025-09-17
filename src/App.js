@@ -8,6 +8,8 @@ import MacroBar from './components/MacroBar';
 import QuickActionsModal from './components/QuickActionsModal';
 import HomeScreen from './screens/HomeScreen';
 import WorkoutsScreen from './screens/WorkoutsScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import AssistantScreen from './screens/AssistantScreen';
 
 const EVAFitApp = () => {
   // Hooks de lógica de negocio
@@ -633,134 +635,21 @@ const EVAFitApp = () => {
 
       case 'profile':
         return (
-          <div className="p-6 space-y-6">
-            <div className="bg-white rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-800 mb-6">Configuración</h2>
-              
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-md font-semibold text-gray-800 mb-4">Objetivos Diarios</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Calorías objetivo
-                      </label>
-                      <input
-                        type="number"
-                        value={dailyGoals.calories}
-                        onChange={(e) => setDailyGoals({...dailyGoals, calories: parseInt(e.target.value) || 0})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Proteína objetivo (g)
-                      </label>
-                      <input
-                        type="number"
-                        value={dailyGoals.protein}
-                        onChange={(e) => setDailyGoals({...dailyGoals, protein: parseInt(e.target.value) || 0})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Carbohidratos objetivo (g)
-                      </label>
-                      <input
-                        type="number"
-                        value={dailyGoals.carbs}
-                        onChange={(e) => setDailyGoals({...dailyGoals, carbs: parseInt(e.target.value) || 0})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Grasas objetivo (g)
-                      </label>
-                      <input
-                        type="number"
-                        value={dailyGoals.fat}
-                        onChange={(e) => setDailyGoals({...dailyGoals, fat: parseInt(e.target.value) || 0})}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-md font-semibold text-gray-800 mb-4">API Keys</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          OpenAI API Key
-                        </label>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          isOpenAIConfigured ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {isOpenAIConfigured ? 'Configurada' : 'No configurada'}
-                        </span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <input
-                          type={showApiKeyInput ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder="sk-..."
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                        />
-                        <button
-                          onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-                          className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                          {showApiKeyInput ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          FoodData Central API Key
-                        </label>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          isFDCConfigured ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {isFDCConfigured ? 'Configurada' : 'No configurada'}
-                        </span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <input
-                          type={showFdcApiKeyInput ? 'text' : 'password'}
-                          value={fdcApiKey}
-                          onChange={(e) => setFdcApiKey(e.target.value)}
-                          placeholder="DEMO_KEY o tu API key"
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                        />
-                        <button
-                          onClick={() => setShowFdcApiKeyInput(!showFdcApiKeyInput)}
-                          className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                          {showFdcApiKeyInput ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <button
-                    onClick={refreshMeals}
-                    className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
-                  >
-                    <Activity className="w-5 h-5" />
-                    <span>Refrescar Datos</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ProfileScreen
+            dailyGoals={dailyGoals}
+            setDailyGoals={setDailyGoals}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            fdcApiKey={fdcApiKey}
+            setFdcApiKey={setFdcApiKey}
+            showApiKeyInput={showApiKeyInput}
+            setShowApiKeyInput={setShowApiKeyInput}
+            showFdcApiKeyInput={showFdcApiKeyInput}
+            setShowFdcApiKeyInput={setShowFdcApiKeyInput}
+            isOpenAIConfigured={isOpenAIConfigured}
+            isFDCConfigured={isFDCConfigured}
+            refreshMeals={refreshMeals}
+          />
         );
 
       default:
