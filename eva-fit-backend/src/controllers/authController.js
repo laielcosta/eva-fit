@@ -1,7 +1,16 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('crypto');
+const crypto = require('crypto');
 const database = require('../database');
+
+// Función para generar UUID v4 simple
+function generateUUID() {
+  return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 class AuthController {
   // Registrar nuevo usuario
@@ -39,7 +48,7 @@ class AuthController {
       const hashedPassword = await bcrypt.hash(password, 12);
       
       // Crear usuario
-      const userId = uuidv4();
+      const userId = generateUUID();
       await database.run(
         'INSERT INTO users (id, email, password, name) VALUES (?, ?, ?, ?)',
         [userId, email.toLowerCase(), hashedPassword, name]
@@ -111,8 +120,12 @@ class AuthController {
       // Parsear objetivos diarios
       let dailyGoals;
       try {
-        dailyGoals = JSON.parse(user.daily_goals);
+        dailyGoals = user.daily_goals ? JSON.parse(user.daily_goals) : null;
       } catch {
+        dailyGoals = null;
+      }
+
+      if (!dailyGoals) {
         dailyGoals = { calories: 2000, protein: 150, carbs: 250, fat: 65 };
       }
 
@@ -151,8 +164,12 @@ class AuthController {
       // Parsear objetivos diarios
       let dailyGoals;
       try {
-        dailyGoals = JSON.parse(user.daily_goals);
+        dailyGoals = user.daily_goals ? JSON.parse(user.daily_goals) : null;
       } catch {
+        dailyGoals = null;
+      }
+
+      if (!dailyGoals) {
         dailyGoals = { calories: 2000, protein: 150, carbs: 250, fat: 65 };
       }
 
@@ -214,8 +231,12 @@ class AuthController {
 
       let parsedGoals;
       try {
-        parsedGoals = JSON.parse(user.daily_goals);
+        parsedGoals = user.daily_goals ? JSON.parse(user.daily_goals) : null;
       } catch {
+        parsedGoals = null;
+      }
+
+      if (!parsedGoals) {
         parsedGoals = { calories: 2000, protein: 150, carbs: 250, fat: 65 };
       }
 
