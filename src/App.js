@@ -10,6 +10,8 @@ import HomeScreen from './screens/HomeScreen';
 import WorkoutsScreen from './screens/WorkoutsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AssistantScreen from './screens/AssistantScreen';
+import Login from './components/Login';
+import { authAPI } from './services/api';
 
 const EVAFitApp = () => {
   // Hooks de lógica de negocio

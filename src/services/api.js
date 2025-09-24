@@ -1,251 +1,257 @@
-// services/api.js - Capa de servicios que simula un backend
-// Más tarde se puede reemplazar con llamadas HTTP reales
+// services/api.js - Conectado al backend real
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
-const STORAGE_KEYS = {
-  MEALS: 'eva_fit_meals',
-  WORKOUTS: 'eva_fit_workouts',
-  GOALS: 'eva_fit_goals',
-  USER_PROFILE: 'eva_fit_profile',
-  RECENT_FOODS: 'eva_fit_recent_foods',
-  CHAT_HISTORY: 'eva_fit_chat'
+// Función para obtener el token de autenticación
+const getAuthToken = () => {
+  return localStorage.getItem('auth_token');
 };
 
-// Simulador de delay de red
-const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
+// Función para guardar el token de autenticación
+const setAuthToken = (token) => {
+  localStorage.setItem('auth_token', token);
+};
 
-// Utilidades de localStorage
-const storage = {
-  get: (key, defaultValue = null) => {
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
-    } catch {
-      return defaultValue;
-    }
-  },
+// Función para remover el token de autenticación
+const removeAuthToken = () => {
+  localStorage.removeItem('auth_token');
+};
+
+// Función helper para hacer peticiones HTTP
+const apiRequest = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const token = getAuthToken();
   
-  set: (key, value) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...options.headers
+    },
+    ...options
+  };
+
+  try {
+    const response = await fetch(url, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+      // Manejar errores de autenticación
+      if (response.status === 401) {
+        removeAuthToken();
+        window.location.href = '/login'; // Redirigir al login si no hay token válido
+        throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+      }
+      throw new Error(data.error || 'Error en la petición');
     }
+
+    return { data, success: true };
+  } catch (error) {
+    console.error(`API Error (${endpoint}):`, error);
+    return { error: error.message, success: false };
   }
 };
 
-// API para Comidas
+// API para autenticación
+export const authAPI = {
+  // Registrar usuario
+  async register(userData) {
+    const response = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+    
+    if (response.success && response.data.token) {
+      setAuthToken(response.data.token);
+    }
+    
+    return response;
+  },
+
+  // Iniciar sesión
+  async login(credentials) {
+    const response = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    });
+    
+    if (response.success && response.data.token) {
+      setAuthToken(response.data.token);
+    }
+    
+    return response;
+  },
+
+  // Cerrar sesión
+  logout() {
+    removeAuthToken();
+    window.location.href = '/login';
+  },
+
+  // Obtener perfil
+  async getProfile() {
+    return await apiRequest('/auth/profile');
+  },
+
+  // Actualizar perfil
+  async updateProfile(profileData) {
+    return await apiRequest('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData)
+    });
+  },
+
+  // Verificar si hay token
+  isAuthenticated() {
+    return !!getAuthToken();
+  }
+};
+
+// API para comidas
 export const mealsAPI = {
   // Obtener todas las comidas
   async getAll() {
-    await delay();
-    const meals = storage.get(STORAGE_KEYS.MEALS, []);
-    return { data: meals, success: true };
+    return await apiRequest('/meals');
   },
 
   // Obtener comidas de hoy
   async getToday() {
-    await delay();
-    const meals = storage.get(STORAGE_KEYS.MEALS, []);
-    const today = new Date().toDateString();
-    const todayMeals = meals.filter(meal => {
-      const mealDate = new Date(meal.time).toDateString();
-      return mealDate === today;
-    });
-    return { data: todayMeals, success: true };
+    const response = await apiRequest('/meals/today');
+    return response.success 
+      ? { data: response.data.meals, success: true }
+      : response;
   },
 
   // Crear nueva comida
   async create(mealData) {
-    await delay();
-    const meals = storage.get(STORAGE_KEYS.MEALS, []);
-    const newMeal = {
-      id: Date.now(),
-      time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      createdAt: new Date().toISOString(),
-      ...mealData
-    };
+    const response = await apiRequest('/meals', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: mealData.name,
+        calories: parseInt(mealData.calories) || 0,
+        protein: parseFloat(mealData.protein) || 0,
+        carbs: parseFloat(mealData.carbs) || 0,
+        fat: parseFloat(mealData.fat) || 0,
+        quantity: parseFloat(mealData.quantity) || 100
+      })
+    });
     
-    meals.push(newMeal);
-    storage.set(STORAGE_KEYS.MEALS, meals);
-    
-    return { data: newMeal, success: true };
+    return response.success 
+      ? { data: response.data.meal, success: true }
+      : response;
   },
 
   // Actualizar comida
   async update(id, mealData) {
-    await delay();
-    const meals = storage.get(STORAGE_KEYS.MEALS, []);
-    const index = meals.findIndex(meal => meal.id === id);
+    const response = await apiRequest(`/meals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(mealData)
+    });
     
-    if (index === -1) {
-      return { error: 'Comida no encontrada', success: false };
-    }
-    
-    meals[index] = { ...meals[index], ...mealData, updatedAt: new Date().toISOString() };
-    storage.set(STORAGE_KEYS.MEALS, meals);
-    
-    return { data: meals[index], success: true };
+    return response.success 
+      ? { data: response.data.meal, success: true }
+      : response;
   },
 
   // Eliminar comida
   async delete(id) {
-    await delay();
-    const meals = storage.get(STORAGE_KEYS.MEALS, []);
-    const filteredMeals = meals.filter(meal => meal.id !== id);
-    storage.set(STORAGE_KEYS.MEALS, filteredMeals);
-    
-    return { success: true };
+    return await apiRequest(`/meals/${id}`, {
+      method: 'DELETE'
+    });
   },
 
   // Obtener estadísticas nutricionales
-  async getStats(date = null) {
-    await delay();
-    const { data: meals } = await this.getToday();
-    
-    const stats = {
-      totalCalories: meals.reduce((sum, meal) => sum + meal.calories, 0),
-      totalProtein: meals.reduce((sum, meal) => sum + meal.protein, 0),
-      totalCarbs: meals.reduce((sum, meal) => sum + meal.carbs, 0),
-      totalFat: meals.reduce((sum, meal) => sum + meal.fat, 0),
-      mealCount: meals.length
-    };
-    
-    return { data: stats, success: true };
+  async getStats() {
+    const response = await apiRequest('/meals/stats');
+    return response.success 
+      ? { data: response.data.stats, success: true }
+      : response;
   }
 };
 
-// API para Entrenamientos
+// API para entrenamientos (básica por ahora)
 export const workoutsAPI = {
   async getAll() {
-    await delay();
-    const workouts = storage.get(STORAGE_KEYS.WORKOUTS, [
-      { id: 1, name: 'Entrenamiento de Pecho', duration: '45 min', exercises: 8, calories: 280, date: 'Hoy' },
-      { id: 2, name: 'Cardio HIIT', duration: '30 min', exercises: 6, calories: 320, date: 'Ayer' }
-    ]);
-    return { data: workouts, success: true };
+    // Datos simulados por ahora - más tarde crearemos la API real
+    const mockWorkouts = [
+      { id: 1, name: 'Push-ups', duration: 15, calories: 120, date: new Date().toISOString().split('T')[0] },
+      { id: 2, name: 'Running', duration: 30, calories: 300, date: new Date().toISOString().split('T')[0] }
+    ];
+    return { data: mockWorkouts, success: true };
   },
 
   async create(workoutData) {
-    await delay();
-    const workouts = storage.get(STORAGE_KEYS.WORKOUTS, []);
+    // Simulado por ahora
     const newWorkout = {
       id: Date.now(),
-      date: 'Hoy',
-      createdAt: new Date().toISOString(),
-      calories: Math.floor(Math.random() * 200) + 150, // Simulación
+      date: new Date().toISOString().split('T')[0],
       ...workoutData
     };
-    
-    workouts.push(newWorkout);
-    storage.set(STORAGE_KEYS.WORKOUTS, workouts);
-    
     return { data: newWorkout, success: true };
   },
 
   async delete(id) {
-    await delay();
-    const workouts = storage.get(STORAGE_KEYS.WORKOUTS, []);
-    const filteredWorkouts = workouts.filter(workout => workout.id !== id);
-    storage.set(STORAGE_KEYS.WORKOUTS, filteredWorkouts);
-    
+    // Simulado por ahora
     return { success: true };
   }
 };
 
-// API para Metas y Objetivos
+// API para objetivos diarios
 export const goalsAPI = {
   async get() {
-    await delay();
-    const goals = storage.get(STORAGE_KEYS.GOALS, {
+    const profile = await authAPI.getProfile();
+    if (profile.success && profile.data.user.dailyGoals) {
+      return { data: profile.data.user.dailyGoals, success: true };
+    }
+    
+    // Valores por defecto si no hay objetivos guardados
+    const defaultGoals = {
       calories: 2000,
       protein: 150,
       carbs: 250,
       fat: 65
-    });
-    return { data: goals, success: true };
+    };
+    
+    return { data: defaultGoals, success: true };
   },
 
   async update(newGoals) {
-    await delay();
-    storage.set(STORAGE_KEYS.GOALS, newGoals);
-    return { data: newGoals, success: true };
+    return await authAPI.updateProfile({ dailyGoals: newGoals });
   }
 };
 
-// API para Perfil de Usuario
-export const userAPI = {
-  async getProfile() {
-    await delay();
-    const profile = storage.get(STORAGE_KEYS.USER_PROFILE, {
-      name: 'Usuario',
-      weight: 70,
-      height: 175,
-      age: 25,
-      activity: 'moderate',
-      goal: 'maintain'
-    });
-    return { data: profile, success: true };
-  },
-
-  async updateProfile(profileData) {
-    await delay();
-    const currentProfile = storage.get(STORAGE_KEYS.USER_PROFILE, {});
-    const updatedProfile = { ...currentProfile, ...profileData };
-    storage.set(STORAGE_KEYS.USER_PROFILE, updatedProfile);
-    return { data: updatedProfile, success: true };
-  }
-};
-
-// API para Alimentos Recientes
+// API para comidas recientes
 export const recentFoodsAPI = {
   async get() {
-    await delay();
-    const recentFoods = storage.get(STORAGE_KEYS.RECENT_FOODS, [
-      { name: 'Pollo a la plancha', calories: 165, protein: 31, carbs: 0, fat: 3.6 },
-      { name: 'Arroz integral', calories: 123, protein: 2.6, carbs: 23, fat: 0.9 },
-      { name: 'Plátano', calories: 89, protein: 1.1, carbs: 23, fat: 0.3 },
-      { name: 'Avena', calories: 68, protein: 2.4, carbs: 12, fat: 1.4 }
-    ]);
-    return { data: recentFoods, success: true };
+    const response = await apiRequest('/meals/recent');
+    return response.success 
+      ? { data: response.data.recentFoods, success: true }
+      : response;
   },
 
   async add(foodData) {
-    await delay();
-    const recentFoods = storage.get(STORAGE_KEYS.RECENT_FOODS, []);
-    
-    // Evitar duplicados
-    const existingIndex = recentFoods.findIndex(food => food.name === foodData.name);
-    if (existingIndex !== -1) {
-      recentFoods.splice(existingIndex, 1);
-    }
-    
-    // Agregar al inicio y limitar a 10 elementos
-    recentFoods.unshift({ ...foodData, lastUsed: new Date().toISOString() });
-    const limitedFoods = recentFoods.slice(0, 10);
-    
-    storage.set(STORAGE_KEYS.RECENT_FOODS, limitedFoods);
-    return { data: limitedFoods, success: true };
+    // Las comidas recientes se agregan automáticamente al crear una comida
+    // Esta función no es necesaria pero la mantenemos por compatibilidad
+    return { success: true };
   }
 };
 
-// API para Chat
+// API para chat (simulada por ahora)
 export const chatAPI = {
   async getHistory() {
-    await delay();
-    const history = storage.get(STORAGE_KEYS.CHAT_HISTORY, [
-      {
+    const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    if (history.length === 0) {
+      history.push({
         id: 1,
         type: 'assistant',
         message: '¡Hola! Soy Eva, tu asistente personal de fitness. Puedo ayudarte con preguntas sobre nutrición, entrenamientos y analizar tus patrones alimenticios. ¿En qué puedo ayudarte?',
         timestamp: new Date().toISOString()
-      }
-    ]);
+      });
+    }
     return { data: history, success: true };
   },
 
   async addMessage(message, type = 'user') {
-    await delay();
-    const history = storage.get(STORAGE_KEYS.CHAT_HISTORY, []);
+    const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
     const newMessage = {
       id: Date.now(),
       type,
@@ -255,28 +261,21 @@ export const chatAPI = {
     
     history.push(newMessage);
     
-    // Limitar a 100 mensajes para no llenar localStorage
     if (history.length > 100) {
       history.splice(0, history.length - 100);
     }
     
-    storage.set(STORAGE_KEYS.CHAT_HISTORY, history);
+    localStorage.setItem('chat_history', JSON.stringify(history));
     return { data: newMessage, success: true };
-  },
-
-  async clearHistory() {
-    await delay();
-    storage.set(STORAGE_KEYS.CHAT_HISTORY, []);
-    return { success: true };
   }
 };
 
-// API consolidada
+// API consolidada manteniendo la estructura anterior para compatibilidad
 export const api = {
+  auth: authAPI,
   meals: mealsAPI,
   workouts: workoutsAPI,
   goals: goalsAPI,
-  user: userAPI,
   recentFoods: recentFoodsAPI,
   chat: chatAPI
 };
@@ -289,7 +288,5 @@ export const handleAPIError = (error) => {
     error: error.message || 'Error desconocido'
   };
 };
-
-
 
 export default api;

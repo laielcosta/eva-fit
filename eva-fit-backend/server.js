@@ -35,6 +35,9 @@ app.get('/health', (req, res) => {
 // Auth routes
 app.use('/api/auth', require('./src/routes/auth'));
 
+// Meals routes
+app.use('/api/meals', require('./src/routes/meals'));
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -69,6 +72,13 @@ const startServer = async () => {
       console.log(`   POST /api/auth/login - Login user`);
       console.log(`   GET /api/auth/profile - Get profile`);
       console.log(`   PUT /api/auth/profile - Update profile`);
+      console.log(`   GET /api/meals - Get all meals`);
+      console.log(`   GET /api/meals/today - Get today's meals`);
+      console.log(`   POST /api/meals - Create meal`);
+      console.log(`   PUT /api/meals/:id - Update meal`);
+      console.log(`   DELETE /api/meals/:id - Delete meal`);
+      console.log(`   GET /api/meals/stats - Nutrition statistics`);
+      console.log(`   GET /api/meals/recent - Recent foods`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
