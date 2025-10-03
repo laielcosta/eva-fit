@@ -11,6 +11,7 @@ import ProfileScreen from './screens/ProfileScreen';
 import AssistantScreen from './screens/AssistantScreen';
 import Login from './components/Login';
 import { authAPI } from './services/api';
+import ProgressScreen from './screens/ProgressScreen';
 
 const EVAFitApp = () => {
   // Estado de autenticación - NUEVO
@@ -235,64 +236,97 @@ const handleLoginSuccess = async (userData) => {
     setActiveTab('nutrition');
   };
 
-  // Componente para renderizar cada pantalla
-  const renderScreen = () => {
-    switch (activeTab) {
-      case 'home':
-        return (
-          <HomeScreen
-            totalCalories={totalCalories}
-            totalProtein={totalProtein}
-            totalCarbs={totalCarbs}
-            totalFat={totalFat}
-            dailyGoals={dailyGoals}
-            meals={meals}
-            mealsLoading={mealsLoading}
-            recentFoods={recentFoods}
-            setShowQuickActions={setShowQuickActions}
-            addMealFromRecent={addMealFromRecent}
-            deleteMeal={deleteMeal}
-          />
-        );
 
-      case 'workouts':
-        return (
-          <WorkoutsScreen
-            workouts={workouts}
-            workoutsLoading={workoutsLoading}
-            workoutsError={workoutsError}
-            workoutStats={workoutStats}
-            totalCaloriesBurned={totalCaloriesBurned}
-            deleteWorkout={deleteWorkout}
-          />
-        );
 
-      case 'profile':
-        return (
-          <ProfileScreen
-            user={user}
-            dailyGoals={dailyGoals}
-            setDailyGoals={setDailyGoals}
-            apiKey={apiKey}
-            setApiKey={setApiKey}
-            fdcApiKey={fdcApiKey}
-            setFdcApiKey={setFdcApiKey}
-            showApiKeyInput={showApiKeyInput}
-            setShowApiKeyInput={setShowApiKeyInput}
-            showFdcApiKeyInput={showFdcApiKeyInput}
-            setShowFdcApiKeyInput={setShowFdcApiKeyInput}
-            isOpenAIConfigured={isOpenAIConfigured}
-            isFDCConfigured={isFDCConfigured}
-            refreshMeals={refreshMeals}
-            onLogout={handleLogout}
-          />
-        );
+// Luego, dentro de la función renderScreen(), actualiza el switch:
+const renderScreen = () => {
+  switch (activeTab) {
+    case 'home':
+      return (
+        <HomeScreen
+          totalCalories={totalCalories}
+          totalProtein={totalProtein}
+          totalCarbs={totalCarbs}
+          totalFat={totalFat}
+          dailyGoals={dailyGoals}
+          meals={meals}
+          mealsLoading={mealsLoading}
+          recentFoods={recentFoods}
+          setShowQuickActions={setShowQuickActions}
+          addMealFromRecent={addMealFromRecent}
+          deleteMeal={deleteMeal}
+        />
+      );
 
-      // ... resto de casos (assistant, progress, etc.)
-      default:
-        return <div>Pantalla en desarrollo</div>;
-    }
-  };
+    case 'progress':
+      return (
+        <ProgressScreen
+          totalCalories={totalCalories}
+          totalProtein={totalProtein}
+          totalCarbs={totalCarbs}
+          totalFat={totalFat}
+          dailyGoals={dailyGoals}
+          nutritionProgress={nutritionProgress}
+          isLoading={mealsLoading}
+        />
+      );
+
+    case 'assistant':
+      return (
+        <AssistantScreen
+          chatMessages={chatMessages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          isSendingMessage={isSendingMessage}
+          capturedImage={capturedImage}
+          setCapturedImage={setCapturedImage}
+          isOpenAIConfigured={isOpenAIConfigured}
+          isAnalyzing={isAnalyzing}
+          fileInputRef={fileInputRef}
+          handleSendMessage={handleSendMessage}
+          handleAnalyzeImage={handleAnalyzeImage}
+          startCamera={startCamera}
+          setActiveTab={setActiveTab}
+        />
+      );
+
+    case 'workouts':
+      return (
+        <WorkoutsScreen
+          workouts={workouts}
+          workoutsLoading={workoutsLoading}
+          workoutsError={workoutsError}
+          workoutStats={workoutStats}
+          totalCaloriesBurned={totalCaloriesBurned}
+          deleteWorkout={deleteWorkout}
+        />
+      );
+
+    case 'profile':
+      return (
+        <ProfileScreen
+          user={user}
+          dailyGoals={dailyGoals}
+          setDailyGoals={setDailyGoals}
+          apiKey={apiKey}
+          setApiKey={setApiKey}
+          fdcApiKey={fdcApiKey}
+          setFdcApiKey={setFdcApiKey}
+          showApiKeyInput={showApiKeyInput}
+          setShowApiKeyInput={setShowApiKeyInput}
+          showFdcApiKeyInput={showFdcApiKeyInput}
+          setShowFdcApiKeyInput={setShowFdcApiKeyInput}
+          isOpenAIConfigured={isOpenAIConfigured}
+          isFDCConfigured={isFDCConfigured}
+          refreshMeals={refreshMeals}
+          onLogout={handleLogout}
+        />
+      );
+
+    default:
+      return <div>Pantalla en desarrollo</div>;
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
