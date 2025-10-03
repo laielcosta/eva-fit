@@ -1,8 +1,12 @@
 import React from 'react';
-import { X, Settings, Activity } from 'lucide-react';
+import { X, Settings, Activity, LogOut } from 'lucide-react';
 import { STYLES, MESSAGES, COLORS } from '../services/constants';
 
 const ProfileScreen = ({
+  // NUEVO - Agregar estos parámetros
+  user,
+  onLogout,
+  
   // Estados de metas
   dailyGoals,
   setDailyGoals,
@@ -26,13 +30,38 @@ const ProfileScreen = ({
 }) => {
   return (
     <div className="p-6 space-y-6">
+      {/* Información del Usuario - NUEVO */}
       <div className={STYLES.card}>
-        <h2 className={`text-lg font-semibold text-${COLORS.text.primary} mb-6`}>Configuración</h2>
+        <h2 className={`text-lg font-semibold text-${COLORS.text.primary} mb-4`}>
+          Mi Perfil
+        </h2>
+        <div className="space-y-3">
+          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-12 h-12 bg-emerald-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-xl">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+            <div>
+              <div className="font-medium text-gray-800">{user?.name || 'Usuario'}</div>
+              <div className="text-sm text-gray-600">{user?.email || ''}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Configuración - Ya existente */}
+      <div className={STYLES.card}>
+        <h2 className={`text-lg font-semibold text-${COLORS.text.primary} mb-6`}>
+          Configuración
+        </h2>
         
         <div className="space-y-6">
           {/* Objetivos Diarios */}
           <div>
-            <h3 className={`text-md font-semibold text-${COLORS.text.primary} mb-4`}>Objetivos Diarios</h3>
+            <h3 className={`text-md font-semibold text-${COLORS.text.primary} mb-4`}>
+              Objetivos Diarios
+            </h3>
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-medium text-${COLORS.text.secondary} mb-2`}>
@@ -83,7 +112,9 @@ const ProfileScreen = ({
 
           {/* API Keys */}
           <div>
-            <h3 className={`text-md font-semibold text-${COLORS.text.primary} mb-4`}>API Keys</h3>
+            <h3 className={`text-md font-semibold text-${COLORS.text.primary} mb-4`}>
+              API Keys
+            </h3>
             <div className="space-y-4">
               {/* OpenAI API Key */}
               <div>
@@ -146,13 +177,22 @@ const ProfileScreen = ({
           </div>
 
           {/* Acciones */}
-          <div className="pt-4 border-t border-gray-200">
+          <div className="space-y-3 pt-4 border-t border-gray-200">
             <button
               onClick={refreshMeals}
               className={`w-full ${STYLES.button.primary} flex items-center justify-center space-x-2`}
             >
               <Activity className="w-5 h-5" />
               <span>{MESSAGES.actions.refresh} Datos</span>
+            </button>
+
+            {/* Botón de Cerrar Sesión - NUEVO */}
+            <button
+              onClick={onLogout}
+              className="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Cerrar Sesión</span>
             </button>
           </div>
         </div>

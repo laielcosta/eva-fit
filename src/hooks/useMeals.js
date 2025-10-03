@@ -21,35 +21,9 @@ export const useMeals = () => {
   });
 
   // Estados de carga
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // ✅ Cambiado de true a false
   const [error, setError] = useState(null);
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    const loadInitialData = async () => {
-      setIsLoading(true);
-      try {
-        // Cargar múltiples datos en paralelo
-        const [mealsResponse, recentFoodsResponse, goalsResponse] = await Promise.all([
-          api.meals.getToday(),
-          api.recentFoods.get(),
-          api.goals.get()
-        ]);
-
-        if (mealsResponse.success) setMeals(mealsResponse.data);
-        if (recentFoodsResponse.success) setRecentFoods(recentFoodsResponse.data);
-        if (goalsResponse.success) setDailyGoals(goalsResponse.data);
-
-      } catch (err) {
-        setError('Error cargando datos');
-        console.error('Error loading initial data:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadInitialData();
-  }, []);
 
   // Cálculos derivados - exactamente igual que antes
   const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0);
@@ -57,7 +31,7 @@ export const useMeals = () => {
   const totalCarbs = meals.reduce((sum, meal) => sum + meal.carbs, 0);
   const totalFat = meals.reduce((sum, meal) => sum + meal.fat, 0);
 
-  // Datos para gráficos de progreso - usando los totales calculados
+  // Datos para gráficos de progreso
   const nutritionProgress = [
     { day: 'Lun', calories: 1850, protein: 140, carbs: 220, fat: 60 },
     { day: 'Mar', calories: 2100, protein: 160, carbs: 280, fat: 70 },
@@ -68,7 +42,31 @@ export const useMeals = () => {
     { day: 'Dom', calories: totalCalories, protein: totalProtein, carbs: totalCarbs, fat: totalFat }
   ];
 
-  // Función para agregar comida - ahora usa la API
+  // ✅ NUEVA FUNCIÓN: Cargar datos iniciales manualmente
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const [mealsResponse, recentFoodsResponse, goalsResponse] = await Promise.all([
+        api.meals.getToday(),
+        api.recentFoods.get(),
+        api.goals.get()
+      ]);
+
+      if (mealsResponse.success) setMeals(mealsResponse.data || []);
+      if (recentFoodsResponse.success) setRecentFoods(recentFoodsResponse.data || []);
+      if (goalsResponse.success) setDailyGoals(goalsResponse.data);
+
+    } catch (err) {
+      setError('Error cargando datos');
+      console.error('Error loading initial data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para agregar comida
   const addMeal = async (setActiveTab, setShowQuickActions, setSearchResults, setSearchQuery) => {
     if (!newMeal.name || !newMeal.calories) return;
 
@@ -82,14 +80,11 @@ export const useMeals = () => {
         fat: Math.round(parseFloat(newMeal.fat) * servingRatio * 10) / 10
       };
 
-      // Llamada a la API
       const response = await api.meals.create(mealData);
       
       if (response.success) {
-        // Actualizar estado local
         setMeals(prev => [...prev, response.data]);
         
-        // Agregar a alimentos recientes
         await api.recentFoods.add({
           name: newMeal.name,
           calories: parseInt(newMeal.calories),
@@ -98,7 +93,6 @@ export const useMeals = () => {
           fat: parseFloat(newMeal.fat)
         });
 
-        // Limpiar formulario y navegar
         setNewMeal({ name: '', calories: '', protein: '', carbs: '', fat: '', serving: '100' });
         setSearchResults([]);
         setSearchQuery('');
@@ -113,7 +107,7 @@ export const useMeals = () => {
     }
   };
 
-  // Función para agregar desde alimentos recientes - ahora usa la API
+  // Función para agregar desde alimentos recientes
   const addMealFromRecent = async (food, setActiveTab, setShowQuickActions) => {
     try {
       setNewMeal({
@@ -125,7 +119,6 @@ export const useMeals = () => {
         serving: '100'
       });
       
-      // Actualizar el uso del alimento reciente
       await api.recentFoods.add(food);
       
       setActiveTab('nutrition');
@@ -167,17 +160,9 @@ export const useMeals = () => {
 
   // Función para refrescar datos
   const refreshMeals = async () => {
-    try {
-      const response = await api.meals.getToday();
-      if (response.success) {
-        setMeals(response.data);
-      }
-    } catch (err) {
-      console.error('Error refreshing meals:', err);
-    }
+    await loadInitialData(); // ✅ Usa la nueva función
   };
 
-  // Retornar todo lo que necesita el componente principal
   return {
     // Estados
     meals,
@@ -202,6 +187,7 @@ export const useMeals = () => {
     nutritionProgress,
     
     // Funciones
+    loadInitialData,  // ✅ NUEVO - Exportar esta función
     addMeal,
     addMealFromRecent,
     updateGoals,

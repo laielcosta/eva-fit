@@ -38,7 +38,6 @@ const apiRequest = async (endpoint, options = {}) => {
       // Manejar errores de autenticación
       if (response.status === 401) {
         removeAuthToken();
-        window.location.href = '/login'; // Redirigir al login si no hay token válido
         throw new Error('Sesión expirada. Inicia sesión nuevamente.');
       }
       throw new Error(data.error || 'Error en la petición');
@@ -84,7 +83,6 @@ export const authAPI = {
   // Cerrar sesión
   logout() {
     removeAuthToken();
-    window.location.href = '/login';
   },
 
   // Obtener perfil
