@@ -12,6 +12,8 @@ import AssistantScreen from './screens/AssistantScreen';
 import Login from './components/Login';
 import { authAPI } from './services/api';
 import ProgressScreen from './screens/ProgressScreen';
+import SearchScreen from './screens/SearchScreen';
+import BarcodeScreen from './screens/BarcodeScreen';
 
 const EVAFitApp = () => {
   // Estado de autenticación - NUEVO
@@ -257,6 +259,41 @@ const renderScreen = () => {
           deleteMeal={deleteMeal}
         />
       );
+
+        case 'search':
+      return (
+        <SearchScreen
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchResults={searchResults}
+          setSearchResults={setSearchResults}
+          isSearching={isSearching}
+          newMeal={newMeal}
+          setNewMeal={setNewMeal}
+          searchFoodByName={searchFoodByName}
+          addMeal={addMeal}
+          setActiveTab={setActiveTab}
+          recentFoods={recentFoods}
+        />
+      );
+
+    case 'barcode':
+      return (
+        <BarcodeScreen
+          scannedBarcode={scannedBarcode}
+          setScannedBarcode={setScannedBarcode}
+          isAnalyzing={isAnalyzing}
+          newMeal={newMeal}
+          setNewMeal={setNewMeal}
+          selectedFood={selectedFood}
+          setSelectedFood={setSelectedFood}
+          searchByBarcode={searchByBarcode}
+          addMeal={addMeal}
+          setActiveTab={setActiveTab}
+          startCamera={startCamera}
+        />
+      );
+
 
     case 'progress':
       return (

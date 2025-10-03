@@ -1,5 +1,14 @@
-const { v4: uuidv4 } = require('crypto');
 const database = require('../database');
+const crypto = require('crypto');
+
+// Función para generar UUID v4 simple
+function generateUUID() {
+  return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 class MealsController {
   // Obtener todas las comidas del usuario
@@ -80,8 +89,10 @@ class MealsController {
         });
       }
 
-      const mealId = uuidv4();
+      const mealId = generateUUID();
       const mealTime = new Date().toISOString();
+
+      console.log('Creating meal:', { mealId, userId: req.userId, name, calories, protein, carbs, fat, quantity, mealTime });
 
       await database.run(
         'INSERT INTO meals (id, user_id, name, calories, protein, carbs, fat, quantity, meal_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -89,7 +100,13 @@ class MealsController {
       );
 
       // Agregar a comidas recientes
-      await this.addToRecentFoods(req.userId, { name, calories, protein: protein || 0, carbs: carbs || 0, fat: fat || 0 });
+      await this.addToRecentFoods(req.userId, { 
+        name, 
+        calories, 
+        protein: protein || 0, 
+        carbs: carbs || 0, 
+        fat: fat || 0 
+      });
 
       const newMeal = {
         id: mealId,
@@ -109,7 +126,8 @@ class MealsController {
     } catch (error) {
       console.error('Error in createMeal:', error);
       res.status(500).json({
-        error: 'Error interno del servidor'
+        error: 'Error interno del servidor',
+        details: error.message
       });
     }
   }
@@ -280,7 +298,7 @@ class MealsController {
         );
       } else {
         // Agregar nuevo
-        const foodId = uuidv4();
+        const foodId = generateUUID();
         await database.run(
           'INSERT INTO recent_foods (id, user_id, name, calories, protein, carbs, fat) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [foodId, userId, foodData.name, foodData.calories, foodData.protein, foodData.carbs, foodData.fat]
