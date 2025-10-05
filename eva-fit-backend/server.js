@@ -1,9 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const database = require('./src/database');
+
+// Seleccionar base de datos según configuración
+const dbType = process.env.DB_TYPE || 'sqlite';
+const database = dbType === 'mysql' 
+  ? require('./src/database-mysql')
+  : require('./src/database');
 
 const app = express();
+// ... resto del código igual
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -66,7 +72,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
-      console.log(`💾 Database: SQLite`);
+      console.log(`💾 Database: ${process.env.DB_TYPE || 'SQLite'}`);
       console.log(`📋 Available endpoints:`);
       console.log(`   POST /api/auth/register - Register user`);
       console.log(`   POST /api/auth/login - Login user`);
