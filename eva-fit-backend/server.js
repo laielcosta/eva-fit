@@ -2,14 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Seleccionar base de datos según configuración
-const dbType = process.env.DB_TYPE || 'sqlite';
-const database = dbType === 'mysql' 
-  ? require('./src/database-mysql')
-  : require('./src/database');
+// ✅ Importación simple y directa
+const database = require('./src/database');
 
 const app = express();
-// ... resto del código igual
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -72,7 +68,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
-      console.log(`💾 Database: ${process.env.DB_TYPE || 'SQLite'}`);
+      console.log(`💾 Database: MySQL`);
       console.log(`📋 Available endpoints:`);
       console.log(`   POST /api/auth/register - Register user`);
       console.log(`   POST /api/auth/login - Login user`);
@@ -87,20 +83,20 @@ const startServer = async () => {
       console.log(`   GET /api/meals/recent - Recent foods`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
 
 // Manejar cierre graceful
 process.on('SIGINT', async () => {
-  console.log('\nShutting down server...');
+  console.log('\n⚠️  Shutting down server...');
   try {
     await database.close();
-    console.log('Database closed');
+    console.log('✅ Database closed');
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    console.error('❌ Error during shutdown:', error);
     process.exit(1);
   }
 });
