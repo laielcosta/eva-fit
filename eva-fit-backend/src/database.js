@@ -5,9 +5,33 @@ class Database {
     this.pool = null;
   }
 
-  async connect() {
-    try {
-      // Configuración del pool
+ async connect() {
+  try {
+    // ✅ Usar MYSQL_URL si existe (Railway), sino usar variables individuales
+    const mysqlUrl = process.env.MYSQL_URL;
+    
+    if (mysqlUrl) {
+      // Parsear la URL de Railway
+      const url = new URL(mysqlUrl);
+      
+      this.pool = mysql.createPool({
+        host: url.hostname,
+        port: parseInt(url.port),
+        user: url.username,
+        password: url.password,
+        database: url.pathname.substring(1), // Remover el '/' inicial
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 0,
+        timezone: '+00:00',
+        dateStrings: false
+      });
+      
+      console.log(`🔗 Connecting to Railway MySQL at ${url.hostname}:${url.port}`);
+    } else {
+      // Configuración con variables individuales (local)
       this.pool = mysql.createPool({
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '3306'),
@@ -19,27 +43,30 @@ class Database {
         queueLimit: 0,
         enableKeepAlive: true,
         keepAliveInitialDelay: 0,
-        timezone: '+00:00', // ✅ Importante para DATETIME
-        dateStrings: false // ✅ Parsear fechas automáticamente
+        timezone: '+00:00',
+        dateStrings: false
       });
-
-      // Probar conexión
-      const connection = await this.pool.getConnection();
-      console.log('✅ Connected to MySQL database at', process.env.DB_HOST || 'localhost');
-      connection.release();
-
-      await this.createTables();
-      return true;
-    } catch (error) {
-      console.error('❌ Error connecting to MySQL:', error.message);
-      console.error('Verify your .env file has:');
-      console.error('  DB_HOST=localhost');
-      console.error('  DB_USER=root');
-      console.error('  DB_PASSWORD=your_password');
-      console.error('  DB_NAME=eva_fit');
-      throw error;
+      
+      console.log(`🔗 Connecting to local MySQL at ${process.env.DB_HOST || 'localhost'}`);
     }
+
+    // Probar conexión
+    const connection = await this.pool.getConnection();
+    console.log('✅ Connected to MySQL database');
+    connection.release();
+
+    await this.createTables();
+    return true;
+  } catch (error) {
+    console.error('❌ Error connecting to MySQL:', error.message);
+    console.error('💡 Verifica:');
+    console.error('   - Host:', process.env.DB_HOST || 'from MYSQL_URL');
+    console.error('   - Port:', process.env.DB_PORT || 'from MYSQL_URL');
+    console.error('   - User:', process.env.DB_USER || 'from MYSQL_URL');
+    console.error('   - Database:', process.env.DB_NAME || 'from MYSQL_URL');
+    throw error;
   }
+}
 
   async createTables() {
     const tables = [
