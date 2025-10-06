@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Scan, Dumbbell, Camera, X } from 'lucide-react';
+import { Search, Scan, Dumbbell, Camera, X, Activity } from 'lucide-react';
 import { STYLES, COLORS, NAVIGATION } from '../services/constants';
 
 const QuickActionsModal = ({ isVisible, onClose, onNavigate }) => {
@@ -26,7 +26,8 @@ const QuickActionsModal = ({ isVisible, onClose, onNavigate }) => {
               Search,
               Scan, 
               Dumbbell,
-              Camera
+              Camera,
+              Activity // ← Añadido
             }[action.icon];
             
             return (

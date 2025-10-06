@@ -57,6 +57,9 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Exercise routes
+app.use('/api/exercises', require('./src/routes/exercises'));
+
 // Inicializar servidor
 const startServer = async () => {
   try {

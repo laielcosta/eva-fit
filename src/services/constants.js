@@ -157,7 +157,8 @@ export const NAVIGATION = {
     { id: 'search', label: 'Buscar Alimento', icon: 'Search', screen: 'search' },
     { id: 'barcode', label: 'Escanear Código', icon: 'Scan', screen: 'barcode' },
     { id: 'workout', label: 'Registrar Ejercicio', icon: 'Dumbbell', screen: 'workouts' },
-    { id: 'photo', label: 'Foto de Comida', icon: 'Camera', screen: 'assistant' }
+    { id: 'photo', label: 'Foto de Comida', icon: 'Camera', screen: 'assistant' },
+    { id: 'exercise-analysis', label: 'Analizar Técnica', icon: 'Activity', screen: 'exercise-analysis' }
   ]
 };
 

@@ -14,6 +14,8 @@ import { authAPI } from './services/api';
 import ProgressScreen from './screens/ProgressScreen';
 import SearchScreen from './screens/SearchScreen';
 import BarcodeScreen from './screens/BarcodeScreen';
+import ExerciseAnalysisScreen from './screens/ExerciseAnalysisScreen';
+import LiveExerciseAnalyzer from './components/LiveExerciseAnalyzer';
 
 const EVAFitApp = () => {
   // Estado de autenticación - NUEVO
@@ -338,6 +340,9 @@ const renderScreen = () => {
           deleteWorkout={deleteWorkout}
         />
       );
+
+    case 'exercise-analysis':
+      return <ExerciseAnalysisScreen setActiveTab={setActiveTab} />;
 
     case 'profile':
       return (

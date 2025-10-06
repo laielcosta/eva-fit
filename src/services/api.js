@@ -35,11 +35,19 @@ const apiRequest = async (endpoint, options = {}) => {
     const data = await response.json();
 
     if (!response.ok) {
-      // Manejar errores de autenticación
+      // ✅ Manejar errores de autenticación diferenciando entre login y sesión expirada
       if (response.status === 401) {
-        removeAuthToken();
-        throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+        // Si es login o register, NO es sesión expirada, son credenciales incorrectas
+        const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+        
+        if (!isAuthEndpoint) {
+          // Solo remover token si NO es un endpoint de auth
+          removeAuthToken();
+          throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+        }
       }
+      
+      // Usar el mensaje de error del backend
       throw new Error(data.error || 'Error en la petición');
     }
 
